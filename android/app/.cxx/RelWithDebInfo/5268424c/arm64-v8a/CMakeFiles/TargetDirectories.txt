@@ -1,0 +1,2 @@
+C:/Users/USER/agni_car_rental/android/app/.cxx/RelWithDebInfo/5268424c/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/USER/agni_car_rental/android/app/.cxx/RelWithDebInfo/5268424c/arm64-v8a/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,95 @@
+    plugins {
+        id "com.android.application"
+        id "kotlin-android"
+        id "dev.flutter.flutter-gradle-plugin"
+        id "com.google.gms.google-services"
+    }
+
+    android {
+        namespace "com.agni.agni_car_rental"
+        compileSdk 36
+
+        defaultConfig {
+            applicationId "com.agni.agni_car_rental"
+            minSdkVersion flutter.minSdkVersion
+            targetSdk 36
+            versionCode 30  
+            versionName "2.0.0"
+        }
+
+        compileOptions {
+            sourceCompatibility JavaVersion.VERSION_17
+            targetCompatibility JavaVersion.VERSION_17
+            coreLibraryDesugaringEnabled true
+        }
+
+        kotlinOptions {
+            jvmTarget = "17"
+        }
+
+        def keystoreProperties = new Properties()
+        def keystorePropertiesFile = rootProject.file("key.properties")
+        if (keystorePropertiesFile.exists()) {
+            keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+        } else {
+            throw new FileNotFoundException("Missing key.properties file")
+        }
+
+        signingConfigs {
+            release {
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword keystoreProperties["keyPassword"]
+                storeFile file(keystoreProperties["storeFile"])
+                storePassword keystoreProperties["storePassword"]
+            }
+            debug {
+                keyAlias "androiddebugkey"
+                keyPassword "android"
+                storeFile file(System.getProperty("user.home") + "/.android/debug.keystore")
+                storePassword "android"
+            }
+        }
+
+        buildTypes {
+            release {
+                signingConfig signingConfigs.release
+                minifyEnabled false
+                shrinkResources false
+                // proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            }
+
+
+            debug {
+                signingConfig signingConfigs.debug
+                minifyEnabled false
+                shrinkResources false
+            }
+        }
+    }
+
+    dependencies {
+        // Firebase BOM (keeps versions aligned)
+        implementation platform("com.google.firebase:firebase-bom:33.11.0")
+        implementation "com.google.firebase:firebase-analytics"
+
+        // ✅ Modern Play Core libs for In-App Updates
+        implementation("com.google.android.play:app-update:2.1.0") {
+            exclude group: "com.google.android.play", module: "core"
+            exclude group: "com.google.android.play", module: "core-ktx"
+        }
+        implementation("com.google.android.play:app-update-ktx:2.1.0") {
+            exclude group: "com.google.android.play", module: "core"
+            exclude group: "com.google.android.play", module: "core-ktx"
+        }
+
+        // ✅ Desugar JDK libraries (for Java 8+ APIs on older devices)
+        coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"
+    }
+
+    // 🔒 Ensure no old play-core is pulled in by other dependencies
+    configurations.all {
+        resolutionStrategy {
+            force "com.google.android.play:app-update:2.1.0"
+            force "com.google.android.play:app-update-ktx:2.1.0"
+        }
+    }
