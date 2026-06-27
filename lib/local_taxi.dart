@@ -316,7 +316,7 @@ class _LocalTaxiState extends State<LocalTaxi> {
 
   static const List<Map<String, dynamic>> majorCities = [
     {"name": "Pune", "minLat": 18.4100, "maxLat": 18.6500, "minLng": 73.7200, "maxLng": 73.9800},
-    {"name": "Mumbai", "minLat": 18.8900, "maxLat": 19.3000, "minLng": 72.7500, "maxLng": 73.0200},
+    {"name": "Mumbai", "minLat": 18.8900, "maxLat": 19.3000, "minLng": 72.7500, "maxLng": 73.2000},
     {"name": "Nashik", "minLat": 19.9000, "maxLat": 20.1000, "minLng": 73.7000, "maxLng": 73.8800},
     {"name": "Nagpur", "minLat": 21.0500, "maxLat": 21.2200, "minLng": 79.0000, "maxLng": 79.1800},
     {"name": "Aurangabad", "minLat": 19.8200, "maxLat": 19.9500, "minLng": 75.2500, "maxLng": 75.4200},
