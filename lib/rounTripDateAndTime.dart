@@ -380,7 +380,7 @@ class _RoundTripDateAndTimeState extends State<RoundTripDateAndTime> {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
           color: active ? Colors.white : surfaceGrey,
           borderRadius: BorderRadius.circular(15),
@@ -390,12 +390,18 @@ class _RoundTripDateAndTimeState extends State<RoundTripDateAndTime> {
         child: Row(
           children: [
             Icon(icon, size: 18, color: active ? primaryAmber : Colors.grey),
-            const SizedBox(width: 10),
-            Text(label,
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: active ? FontWeight.bold : FontWeight.w500,
-                    color: active ? darkCharcoal : Colors.grey[600])),
+                    color: active ? darkCharcoal : Colors.grey[600]),
+              ),
+            ),
           ],
         ),
       ),
