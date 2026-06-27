@@ -423,13 +423,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   void _showEditProfileDialog(Map<String, dynamic> theme) {
     final TextEditingController nameController =
-        TextEditingController(text: user?['name'] ?? '');
+        TextEditingController(text: user?['name']?.toString() ?? '');
     final TextEditingController emailController =
-        TextEditingController(text: user?['email'] ?? '');
+        TextEditingController(text: user?['email']?.toString() ?? '');
     final TextEditingController cityController =
-        TextEditingController(text: user?['city'] ?? '');
+        TextEditingController(text: user?['city']?.toString() ?? '');
     final TextEditingController pincodeController =
-        TextEditingController(text: user?['pincode'] ?? '');
+        TextEditingController(text: user?['pincode']?.toString() ?? '');
 
     bool isSaving = false;
 
