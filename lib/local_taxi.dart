@@ -314,8 +314,62 @@ class _LocalTaxiState extends State<LocalTaxi> {
 ]
 ''';
 
+  bool _checkCityBoundary(LatLng latLng, String address) {
+    // Bounding Box limits for Pune City
+    const double minLat = 18.4100;
+    const double maxLat = 18.6500;
+    const double minLng = 73.7200;
+    const double maxLng = 73.9800;
+
+    bool withinCoords = (latLng.latitude >= minLat && latLng.latitude <= maxLat) &&
+                         (latLng.longitude >= minLng && latLng.longitude <= maxLng);
+    
+    bool containsPune = address.toLowerCase().contains('pune');
+    return withinCoords || containsPune;
+  }
+
+  void _showBoundaryError(String locationType) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            "Outside City Limits",
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.red),
+          ),
+          content: Text(
+            "Your selected $locationType is outside Pune city limits. Local Taxi bookings are restricted strictly within Pune City limits. For longer trips, please use our One-Way service.",
+            style: GoogleFonts.poppins(),
+          ),
+          actions: [
+            TextButton(
+              child: Text(
+                "OK",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: const Color(0xFFFFB300)),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _proceed() {
     if (selectedCar.isEmpty) return;
+
+    // Validate Pune City Limits for Pickup Address
+    if (fromLatLng != null && !_checkCityBoundary(fromLatLng!, fullAddress)) {
+      _showBoundaryError("Pickup location");
+      return;
+    }
+
+    // Validate Pune City Limits for Drop Address
+    if (toLatLng != null && !_checkCityBoundary(toLatLng!, toController.text)) {
+      _showBoundaryError("Drop location");
+      return;
+    }
+
     var fareData = carFares.firstWhere((f) => f["car_type"] == selectedCar);
 
     Navigator.push(
@@ -328,6 +382,10 @@ class _LocalTaxiState extends State<LocalTaxi> {
             "car_type": selectedCar,
             "total_amount": fareData["discounted_price"].toString(),
             "distance": kmLimit,
+            "from_lat": fromLatLng?.latitude.toString() ?? "",
+            "from_lng": fromLatLng?.longitude.toString() ?? "",
+            "to_lat": toLatLng?.latitude.toString() ?? "",
+            "to_lng": toLatLng?.longitude.toString() ?? "",
           },
         ),
       ),
