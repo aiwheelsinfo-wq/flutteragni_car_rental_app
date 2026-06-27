@@ -101,6 +101,10 @@ class _CustomerRegistrationPageState extends State<CustomerRegistrationPage> {
         'car_type': widget.bookingData?['car_type'],
         'total_amount': widget.bookingData?['total_amount'],
         'distance': widget.bookingData?['distance'],
+        'from_lat': widget.bookingData?['from_lat'],
+        'from_lng': widget.bookingData?['from_lng'],
+        'to_lat': widget.bookingData?['to_lat'],
+        'to_lng': widget.bookingData?['to_lng'],
       };
 
       try {
@@ -111,6 +115,9 @@ class _CustomerRegistrationPageState extends State<CustomerRegistrationPage> {
           body: jsonEncode(combinedData),
         );
 
+        print("LocalTaxi Booking Response Code: ${response.statusCode}");
+        print("LocalTaxi Booking Response Body: ${response.body}");
+
         final result = jsonDecode(response.body);
         if (result['status'] == 'success') {
           _showSuccessDialog();
@@ -118,6 +125,7 @@ class _CustomerRegistrationPageState extends State<CustomerRegistrationPage> {
           _showError(result['message']);
         }
       } catch (e) {
+        print("LocalTaxi Booking Error: $e");
         _showError("Network connection error");
       } finally {
         setState(() => isLoading = false);

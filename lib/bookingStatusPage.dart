@@ -1055,66 +1055,82 @@ class _BookingStatusPageState extends State<BookingStatusPage>
   }
 
   Widget _buildLicensePlate(String regNum) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: Colors.yellow.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.black87, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          )
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-            decoration: const BoxDecoration(
-              color: Color(0xFF0033A0), // IND HSRP blue color
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(6),
-                bottomLeft: Radius.circular(6),
-              ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.circle,
-                  size: 6,
-                  color: Colors.white,
+    if (regNum.isEmpty || regNum.toLowerCase().contains('allocating')) {
+      return Text(
+        "Car assignment pending",
+        style: GoogleFonts.poppins(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: Colors.grey.shade600,
+          fontStyle: FontStyle.italic,
+        ),
+      );
+    }
+
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(top: 8),
+        decoration: BoxDecoration(
+          color: Colors.yellow.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.black87, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            )
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              decoration: const BoxDecoration(
+                color: Color(0xFF0033A0), // IND HSRP blue color
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(6),
+                  bottomLeft: Radius.circular(6),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  "IND",
-                  style: GoogleFonts.poppins(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w900,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.circle,
+                    size: 6,
                     color: Colors.white,
-                    letterSpacing: 0.5,
                   ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            child: Text(
-              regNum.toUpperCase(),
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: Colors.black87,
-                letterSpacing: 2.0,
+                  const SizedBox(height: 2),
+                  Text(
+                    "IND",
+                    style: GoogleFonts.poppins(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              child: Text(
+                regNum.toUpperCase(),
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black87,
+                  letterSpacing: 2.0,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1497,6 +1513,13 @@ Thank you for choosing Rentox system!
     if (status != 'Pending' && status != 'Confirmed' && status != 'Accepted') {
       return false;
     }
+
+    final bool isLocalTaxi = (booking['trip_type'] ?? '').toString().toLowerCase().contains('local') &&
+                             (booking['trip_type'] ?? '').toString().toLowerCase().contains('taxi');
+    if (isLocalTaxi) {
+      // Local Taxi bookings can be cancelled any time before the driver starts the trip
+      return true;
+    }
     
     // Check if trip started (pickup time in future)
     try {
@@ -1567,6 +1590,8 @@ Thank you for choosing Rentox system!
   }
 
   void _showCancellationBottomSheet(BuildContext context, Map<String, dynamic> booking) {
+    final bool isLocalTaxi = (booking['trip_type'] ?? '').toString().toLowerCase().contains('local') &&
+                             (booking['trip_type'] ?? '').toString().toLowerCase().contains('taxi');
     String selectedReason = 'Change of Plans';
     final List<String> reasons = [
       'Change of Plans',
@@ -1578,6 +1603,8 @@ Thank you for choosing Rentox system!
     ];
     
     bool isSubmitting = false;
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     // Define the future once to prevent refetching during bottom sheet rebuilds (e.g. when reason chip selected)
     final previewFuture = http.get(Uri.parse('${ApiConfig.baseUrl}/cancellation_preview.php?booking_id=${booking['id']}'));
 
@@ -1587,12 +1614,12 @@ Thank you for choosing Rentox system!
         borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
       isScrollControlled: true,
-      builder: (context) {
+      builder: (sheetContext) {
         return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
+          builder: (BuildContext modalContext, StateSetter setModalState) {
             return FutureBuilder<http.Response>(
               future: previewFuture,
-              builder: (context, snapshot) {
+              builder: (futureBuilderContext, snapshot) {
                 Widget previewCard;
                 double refundAmt = 0.0;
                 double chargeAmt = 0.0;
@@ -1685,7 +1712,7 @@ Thank you for choosing Rentox system!
 
                 return SafeArea(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
+                    padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(modalContext).viewInsets.bottom),
                     child: SingleChildScrollView(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -1711,41 +1738,66 @@ Thank you for choosing Rentox system!
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            "Are you sure you want to cancel this booking? Refund will be calculated according to our cancellation policy.",
+                            isLocalTaxi
+                                ? "Are you sure you want to cancel this booking? Since this is a Local Taxi booking, free cancellation applies."
+                                : "Are you sure you want to cancel this booking? Refund will be calculated according to our cancellation policy.",
                             style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600], height: 1.4, fontWeight: FontWeight.w500),
                           ),
                           const SizedBox(height: 16),
                           Container(
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: Colors.amber.shade50.withOpacity(0.3),
+                              color: isLocalTaxi
+                                  ? Colors.green.shade50.withOpacity(0.3)
+                                  : Colors.amber.shade50.withOpacity(0.3),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.amber.shade200, width: 0.8),
+                              border: Border.all(
+                                color: isLocalTaxi ? Colors.green.shade200 : Colors.amber.shade200,
+                                width: 0.8,
+                              ),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: [
-                                    Icon(Icons.policy_outlined, size: 16, color: Colors.amber.shade900),
+                                    Icon(
+                                      Icons.policy_outlined,
+                                      size: 16,
+                                      color: isLocalTaxi ? Colors.green.shade900 : Colors.amber.shade900,
+                                    ),
                                     const SizedBox(width: 8),
                                     Text(
                                       "CANCELLATION POLICY",
                                       style: GoogleFonts.poppins(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w800,
-                                        color: Colors.amber.shade900,
+                                        color: isLocalTaxi ? Colors.green.shade900 : Colors.amber.shade900,
                                         letterSpacing: 0.5,
                                       ),
                                     ),
                                   ],
                                 ),
                                 const Divider(height: 16, thickness: 0.5),
-                                _buildPolicyRuleRow("More than 48 Hours", "100% Refund", isGreen: true),
-                                _buildPolicyRuleRow("24–48 Hours", "75% Refund"),
-                                _buildPolicyRuleRow("12–24 Hours", "50% Refund"),
-                                _buildPolicyRuleRow("6–12 Hours", "25% Refund"),
-                                _buildPolicyRuleRow("Less than 6 Hours", "No Refund", isRed: true),
+                                isLocalTaxi
+                                    ? Text(
+                                        "Free Cancellation - You can cancel your Local Taxi booking anytime before the trip starts with no cancellation fee.",
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 12,
+                                          color: Colors.green.shade900,
+                                          fontWeight: FontWeight.w500,
+                                          height: 1.4,
+                                        ),
+                                      )
+                                    : Column(
+                                        children: [
+                                          _buildPolicyRuleRow("More than 48 Hours", "100% Refund", isGreen: true),
+                                          _buildPolicyRuleRow("24–48 Hours", "75% Refund"),
+                                          _buildPolicyRuleRow("12–24 Hours", "50% Refund"),
+                                          _buildPolicyRuleRow("6–12 Hours", "25% Refund"),
+                                          _buildPolicyRuleRow("Less than 6 Hours", "No Refund", isRed: true),
+                                        ],
+                                      ),
                               ],
                             ),
                           ),
@@ -1787,11 +1839,13 @@ Thank you for choosing Rentox system!
                           ),
                           const SizedBox(height: 20),
                           previewCard,
-                          const SizedBox(height: 12),
-                          Text(
-                            "* Refund will be processed within 3–7 business days.",
-                            style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey[500], fontStyle: FontStyle.italic),
-                          ),
+                          if (!isLocalTaxi) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              "* Refund will be processed within 3–7 business days.",
+                              style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey[500], fontStyle: FontStyle.italic),
+                            ),
+                          ],
                           const SizedBox(height: 24),
                           Row(
                             children: [
@@ -1799,7 +1853,7 @@ Thank you for choosing Rentox system!
                                 child: SizedBox(
                                   height: 48,
                                   child: ElevatedButton(
-                                    onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                                    onPressed: isSubmitting ? null : () => Navigator.pop(modalContext),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.grey[200],
                                       foregroundColor: Colors.grey[800],
@@ -1821,6 +1875,7 @@ Thank you for choosing Rentox system!
                                             setModalState(() {
                                               isSubmitting = true;
                                             });
+                                            bool success = false;
                                             try {
                                               final response = await http.post(
                                                 Uri.parse('${ApiConfig.baseUrl}/cancel_booking.php'),
@@ -1832,11 +1887,11 @@ Thank you for choosing Rentox system!
                                               if (response.statusCode == 200) {
                                                 final res = jsonDecode(response.body);
                                                 if (res['status'] == 'success') {
-                                                  Navigator.pop(context); // Close sheet
+                                                  success = true;
+                                                  navigator.pop(); // Close sheet
                                                   
                                                   // Navigate to success screen
-                                                  Navigator.push(
-                                                    context,
+                                                  navigator.push(
                                                     MaterialPageRoute(
                                                       builder: (_) => CancellationSuccessPage(
                                                         bookingId: booking['id'].toString(),
@@ -1844,6 +1899,7 @@ Thank you for choosing Rentox system!
                                                         cancellationCharge: chargeAmt,
                                                         refundAmount: refundAmt,
                                                         refundStatus: res['data']['refund_status'] ?? 'Processing',
+                                                        isLocalTaxi: isLocalTaxi,
                                                       ),
                                                     ),
                                                   );
@@ -1851,23 +1907,25 @@ Thank you for choosing Rentox system!
                                                   // Refresh the bookings list
                                                   if (phoneNumber != null) fetchBookings(phoneNumber!);
                                                 } else {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                  scaffoldMessenger.showSnackBar(
                                                     SnackBar(content: Text(res['message'] ?? "Cancellation failed")),
                                                   );
                                                 }
                                               } else {
-                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                scaffoldMessenger.showSnackBar(
                                                   const SnackBar(content: Text("Server error. Please try again later.")),
                                                 );
                                               }
                                             } catch (e) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
+                                              scaffoldMessenger.showSnackBar(
                                                 SnackBar(content: Text("Error: $e")),
                                               );
                                             } finally {
-                                              setModalState(() {
-                                                isSubmitting = false;
-                                              });
+                                              if (!success) {
+                                                setModalState(() {
+                                                  isSubmitting = false;
+                                                });
+                                              }
                                             }
                                           },
                                     style: ElevatedButton.styleFrom(
@@ -1898,6 +1956,8 @@ Thank you for choosing Rentox system!
   }
 
   Widget _buildCancellationDetailsCard(Map<String, dynamic> booking) {
+    final bool isLocalTaxi = (booking['trip_type'] ?? '').toString().toLowerCase().contains('local') &&
+                             (booking['trip_type'] ?? '').toString().toLowerCase().contains('taxi');
     double advancePaid = double.tryParse(booking['paid_amount']?.toString() ?? '0') ?? 0.0;
     double chargeAmt = double.tryParse(booking['cancellation_charge']?.toString() ?? '0') ?? 0.0;
     double refundAmt = double.tryParse(booking['refund_amount']?.toString() ?? '0') ?? 0.0;
@@ -1914,23 +1974,32 @@ Thank you for choosing Rentox system!
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.red.shade50.withOpacity(0.4),
+          color: isLocalTaxi
+              ? Colors.green.shade50.withOpacity(0.4)
+              : Colors.red.shade50.withOpacity(0.4),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.red.shade100, width: 0.8),
+          border: Border.all(
+            color: isLocalTaxi ? Colors.green.shade100 : Colors.red.shade100,
+            width: 0.8,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.red[800], size: 18),
+                Icon(
+                  Icons.info_outline,
+                  color: isLocalTaxi ? Colors.green[800] : Colors.red[800],
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   "CANCELLATION DETAILS",
                   style: GoogleFonts.poppins(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: Colors.red[800],
+                    color: isLocalTaxi ? Colors.green[800] : Colors.red[800],
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -1987,32 +2056,53 @@ Thank you for choosing Rentox system!
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.9),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.shade100, width: 0.5),
+                border: Border.all(
+                  color: isLocalTaxi ? Colors.green.shade100 : Colors.red.shade100,
+                  width: 0.5,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.policy_outlined, size: 14, color: Colors.red[800]),
+                      Icon(
+                        Icons.policy_outlined,
+                        size: 14,
+                        color: isLocalTaxi ? Colors.green[800] : Colors.red[800],
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         "CANCELLATION POLICY REFERENCE",
                         style: GoogleFonts.poppins(
                           fontSize: 9,
                           fontWeight: FontWeight.w800,
-                          color: Colors.red[800],
+                          color: isLocalTaxi ? Colors.green[800] : Colors.red[800],
                           letterSpacing: 0.5,
                         ),
                       ),
                     ],
                   ),
                   const Divider(height: 12, thickness: 0.5),
-                  _buildPolicyRuleRow("More than 48 Hours", "100% Refund", isGreen: true),
-                  _buildPolicyRuleRow("24–48 Hours", "75% Refund"),
-                  _buildPolicyRuleRow("12–24 Hours", "50% Refund"),
-                  _buildPolicyRuleRow("6–12 Hours", "25% Refund"),
-                  _buildPolicyRuleRow("Less than 6 Hours", "No Refund", isRed: true),
+                  isLocalTaxi
+                      ? Text(
+                          "Free Cancellation - You can cancel your Local Taxi booking anytime before the trip starts with no cancellation fee.",
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: Colors.green[900],
+                            fontWeight: FontWeight.w500,
+                            height: 1.4,
+                          ),
+                        )
+                      : Column(
+                          children: [
+                            _buildPolicyRuleRow("More than 48 Hours", "100% Refund", isGreen: true),
+                            _buildPolicyRuleRow("24–48 Hours", "75% Refund"),
+                            _buildPolicyRuleRow("12–24 Hours", "50% Refund"),
+                            _buildPolicyRuleRow("6–12 Hours", "25% Refund"),
+                            _buildPolicyRuleRow("Less than 6 Hours", "No Refund", isRed: true),
+                          ],
+                        ),
                 ],
               ),
             ),
@@ -2053,6 +2143,8 @@ Thank you for choosing Rentox system!
   }
 
   Widget _buildCancellationTimeline(Map<String, dynamic> booking) {
+    final bool isLocalTaxi = (booking['trip_type'] ?? '').toString().toLowerCase().contains('local') &&
+                             (booking['trip_type'] ?? '').toString().toLowerCase().contains('taxi');
     String bookingStatus = booking['booking_status'] ?? 'Pending';
     String refundStatus = booking['refund_status'] ?? 'Processing';
     bool driverAssigned = booking['driver_id'] != null && booking['driver_id'].toString().isNotEmpty;
@@ -2078,7 +2170,7 @@ Thank you for choosing Rentox system!
           Padding(
             padding: const EdgeInsets.only(left: 4),
             child: Text(
-              "CANCELLATION & REFUND TIMELINE",
+              isLocalTaxi ? "CANCELLATION TIMELINE" : "CANCELLATION & REFUND TIMELINE",
               style: GoogleFonts.poppins(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
@@ -2091,19 +2183,24 @@ Thank you for choosing Rentox system!
           _buildTimelineStep("Booking Confirmed", bookedAt, step1, Colors.green),
           _buildTimelineDivider(step2),
           _buildTimelineStep("Driver Assigned", assignedAt, step2, Colors.green, isOptional: !driverAssigned),
-          if (driverAssigned) _buildTimelineDivider(step3),
-          _buildTimelineStep("Cancellation Requested", cancelledAt, step3, Colors.orange),
-          _buildTimelineDivider(step4),
-          _buildTimelineStep("Booking Cancelled", cancelledAt, step4, Colors.red),
-          _buildTimelineDivider(step5),
-          _buildTimelineStep(
-            refundStatus == 'Pending Approval' ? 'Refund Pending Approval'
-            : refundStatus == 'Processing' ? 'Refund Processing'
-            : 'Refund Initiated',
-            '', step5, Colors.blue,
-          ),
-          _buildTimelineDivider(step6),
-          _buildTimelineStep("Refund Completed", "Settled", step6, Colors.green),
+          if (isLocalTaxi) ...[
+            _buildTimelineDivider(step4),
+            _buildTimelineStep("Booking Cancelled", cancelledAt, step4, Colors.red),
+          ] else ...[
+            if (driverAssigned) _buildTimelineDivider(step3),
+            _buildTimelineStep("Cancellation Requested", cancelledAt, step3, Colors.orange),
+            _buildTimelineDivider(step4),
+            _buildTimelineStep("Booking Cancelled", cancelledAt, step4, Colors.red),
+            _buildTimelineDivider(step5),
+            _buildTimelineStep(
+              refundStatus == 'Pending Approval' ? 'Refund Pending Approval'
+              : refundStatus == 'Processing' ? 'Refund Processing'
+              : 'Refund Initiated',
+              '', step5, Colors.blue,
+            ),
+            _buildTimelineDivider(step6),
+            _buildTimelineStep("Refund Completed", "Settled", step6, Colors.green),
+          ],
         ],
       ),
     );

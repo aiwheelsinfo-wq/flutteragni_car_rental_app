@@ -35,7 +35,7 @@ class _RazorpayPaymentPageState extends State<RazorpayPaymentPage> {
 
   void _openCheckout() {
     var options = {
-      'key': 'rzp_live_q9eMvidQ7LrwVQ', // Replace with your actual key
+      'key': ApiConfig.razorpayKey, // Replace with your actual key
       'amount': (widget.amount * 100).toInt(), //(1 * 100).toInt(),
       'name': 'Agni Car Rental',
       'description': widget.isFullPay ? 'Full Payment' : 'Part Payment',
@@ -92,8 +92,25 @@ class _RazorpayPaymentPageState extends State<RazorpayPaymentPage> {
     }
   }
 
-  void _handleError(PaymentFailureResponse response) {
+  Future<void> _handleError(PaymentFailureResponse response) async {
     print("Payment Failed: ${response.message}");
+    var url = Uri.parse("${ApiConfig.baseUrl}/updatePayment.php");
+    try {
+      await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: json.encode({
+          "booking_id": widget.bookingId,
+          "payment_id": "",
+          "status": "failed",
+          "amount": widget.amount,
+        }),
+      );
+    } catch (e) {
+      print("Error during marking payment as failed: $e");
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("Payment failed! Try again.")),
     );

@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import 'dart:math';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:agni_car_rental/config/api_config.dart';
+import 'package:share_plus/share_plus.dart';
 
 class InvoicePage extends StatefulWidget {
   String bookingId;
@@ -64,6 +65,8 @@ class _InvoicePageState extends State<InvoicePage> {
     'total_amount': '0',
     'agent_commission': '0',
     'permit_charge': '0',
+    'base_charge': '0',
+    'paid_amount': '0',
   };
 
   @override
@@ -137,6 +140,10 @@ class _InvoicePageState extends State<InvoicePage> {
                 (data['agent_commission'] ?? '0').toString();
             invoiceData['permit_charge'] =
                 (data['permit_charge'] ?? '0').toString();
+            invoiceData['base_charge'] =
+                (data['base_charge'] ?? '0').toString();
+            invoiceData['paid_amount'] =
+                (data['paid_amount'] ?? '0').toString();
           });
         } else {
           print(data['error']);
@@ -149,17 +156,515 @@ class _InvoicePageState extends State<InvoicePage> {
     }
   }
 
+  pw.TableRow _buildPdfTableRow(String col1, String col2, String col3) {
+    return pw.TableRow(
+      children: [
+        pw.Padding(
+            padding: const pw.EdgeInsets.all(4.0),
+            child: pw.Text(col1,
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
+        pw.Padding(
+            padding: const pw.EdgeInsets.all(4.0),
+            child: pw.Text(col2, style: const pw.TextStyle(fontSize: 10))),
+        pw.Padding(
+            padding: const pw.EdgeInsets.all(4.0),
+            child: pw.Text(col3, style: const pw.TextStyle(fontSize: 10))),
+      ],
+    );
+  }
+
+  Future<pw.Document> _generateDocument() async {
+    final pdf = pw.Document();
+    final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
+    
+    final totalKm = double.parse(invoiceData['closing_km']!) -
+        double.parse(invoiceData['starting_km']!);
+    final startingDate = invoiceData['starting_date']; // e.g., "2025-04-26"
+    final startingTime = invoiceData['starting_time']; // e.g., "09:00:00"
+    final closingDate = invoiceData['closing_date']; // e.g., "2025-04-26"
+    final closingTime = invoiceData['closing_time']; // e.g., "17:30:00"
+    final startDateTime = DateTime.parse('$startingDate $startingTime');
+    final endDateTime = DateTime.parse('$closingDate $closingTime');
+    final duration = endDateTime.difference(startDateTime);
+    var hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    String? commission;
+    double? packageBaseWithCommission;
+    int? totalDays = 0;
+    double? extraKm;
+    double? extrakmAmount;
+    num? extraHours;
+    double? extraHoursAmount;
+    double? gst;
+    double? netTotal;
+    String? driver_allowance;
+    double? baceAmount;
+
+    var maxKm;
+    double kmRate =
+        double.tryParse(invoiceData['kmRate']?.toString() ?? '') ?? 0.0;
+    double gstPercent = double.parse(invoiceData['gstPercent'].toString());
+    double? agent_commission =
+        double.tryParse(invoiceData['agent_commission'].toString()) ?? 0.0;
+    double? permit_charge =
+        double.tryParse(invoiceData['permit_charge'].toString()) ?? 0.0;
+    double? parking_charge =
+        double.tryParse(invoiceData['parking_charge'].toString()) ?? 0.0;
+    double? toll_charge =
+        double.tryParse(invoiceData['toll_charge'].toString()) ?? 0.0;
+    if (invoiceData['trip_type'] == 'Local-Duty') {
+      // Parse inputs safely
+      final packageKm = double.tryParse(invoiceData['packageKm'] ?? '0') ?? 0;
+      final packageHours =
+          double.tryParse(invoiceData['packageHours'] ?? '0') ?? 0;
+      final extraKmPrice =
+          double.tryParse(invoiceData['extra_km_price'] ?? '0') ?? 0;
+      final extraHoursPrice =
+          double.tryParse(invoiceData['extra_hours_price'] ?? '0') ?? 0;
+      final packageBaseFare =
+          double.tryParse(invoiceData['packageBaseFare'] ?? '0') ?? 0;
+      double driverAllowance = 0.0;
+
+      // Extra km
+      extraKm = totalKm > packageKm ? totalKm - packageKm : 0;
+      extrakmAmount = extraKm * extraKmPrice;
+
+      // Extra hours
+      if (minutes > 30) hours += 1;
+      extraHours = hours > packageHours ? hours - packageHours : 0;
+      extraHoursAmount = extraHours * extraHoursPrice;
+
+      // Special allowance: start before 5AM or end after 11:30PM
+      bool isStartBefore5AM = startDateTime.hour < 5;
+      bool isEndAfter1130PM = endDateTime.hour > 23 ||
+          (endDateTime.hour == 23 && endDateTime.minute > 30);
+      if (isStartBefore5AM || isEndAfter1130PM) {
+        driverAllowance =
+            double.tryParse(invoiceData['driver_allowance'] ?? '0') ?? 0;
+      }
+
+      // Total base before GST
+      double totalBeforeGst =
+          packageBaseFare + extrakmAmount + extraHoursAmount + agent_commission;
+
+      // GST and net total
+      gst = totalBeforeGst * gstPercent / 100;
+      netTotal = totalBeforeGst +
+          gst +
+          parking_charge +
+          toll_charge +
+          permit_charge +
+          driverAllowance;
+
+      // Format all numbers to 2 decimal places
+      baceAmount = double.parse(packageBaseFare.toStringAsFixed(2));
+      packageBaseWithCommission =
+          double.parse((packageBaseFare + agent_commission).toStringAsFixed(2));
+      extrakmAmount = double.parse(extrakmAmount.toStringAsFixed(2));
+      extraHoursAmount = double.parse(extraHoursAmount.toStringAsFixed(2));
+      driverAllowance = double.parse(driverAllowance.toStringAsFixed(2));
+      totalBeforeGst = double.parse(totalBeforeGst.toStringAsFixed(2));
+      gst = double.parse(gst.toStringAsFixed(2));
+      netTotal = double.parse(netTotal.toStringAsFixed(2));
+      driver_allowance = driverAllowance.toString();
+    }
+
+    if (invoiceData['trip_type'] == 'Round-Trip') {
+      Duration diff = endDateTime.difference(startDateTime);
+      int days = diff.inDays;
+      double? driver_allowanceXdays;
+
+      driver_allowance = invoiceData['driver_allowance'].toString();
+
+      double runningKm = double.parse(invoiceData['closing_km'] ?? '0') -
+          double.parse(invoiceData['starting_km'] ?? '0');
+      double daily_limit = double.parse(invoiceData['daily_limit'] ?? '0');
+
+      commission = userType == 'agent' ? '+${agent_commission.toString()}' : '';
+
+      if (startDateTime.day == endDateTime.day) {
+        days += 1;
+      } else {
+        days += 1;
+
+        if (diff < const Duration(hours: 24)) {
+          days += 1;
+        }
+
+        if ((endDateTime.hour == 23)) {
+          days += 1;
+        }
+
+        if (endDateTime.hour < 6 ||
+            (endDateTime.hour == 6 && endDateTime.minute < 30)) {
+          days += 1;
+        }
+
+        if (startDateTime.hour < 6 ||
+            (startDateTime.hour == 6 && startDateTime.minute < 30)) {
+          days += 1;
+        }
+      }
+      maxKm = max(runningKm, (daily_limit * days));
+      driver_allowanceXdays = double.parse(driver_allowance) * days;
+      driver_allowance = driver_allowanceXdays.toString();
+      totalDays = days;
+      baceAmount = (maxKm ?? 0) * (kmRate) + agent_commission;
+
+      gst = baceAmount! * gstPercent / 100;
+
+      netTotal = baceAmount +
+          gst +
+          parking_charge +
+          toll_charge +
+          permit_charge +
+          driver_allowanceXdays;
+    }
+
+    double base_charge = 0.0;
+    if (invoiceData['trip_type'] == 'One-way') {
+      double distance = double.parse(invoiceData['distance'].toString());
+      double driver_allowanceVal;
+
+      driver_allowanceVal = (distance < 200) ? 300 : 400;
+
+      baceAmount = invoiceData['total_amount'] != '0'
+          ? double.parse(invoiceData['total_amount'].toString())
+          : (distance * kmRate) + driver_allowanceVal;
+
+      double totalbeforeGst = (distance * kmRate) + agent_commission;
+
+      gst = baceAmount * gstPercent / 100;
+      netTotal = baceAmount + gst + parking_charge;
+
+      base_charge = double.tryParse(invoiceData['base_charge']?.toString() ?? '') ?? 0.0;
+      if (base_charge == 0.0) {
+        base_charge = baceAmount - agent_commission;
+      }
+
+      // Format all values to 2 decimal places
+      baceAmount = double.parse(baceAmount.toStringAsFixed(2));
+      totalbeforeGst = double.parse(totalbeforeGst.toStringAsFixed(2));
+      gst = double.parse(gst.toStringAsFixed(2));
+      netTotal = double.parse(netTotal.toStringAsFixed(2));
+      driver_allowance = driver_allowanceVal.toString();
+    }
+
+    if (invoiceData['trip_type'] == 'Local-taxi') {
+      netTotal = double.parse(invoiceData['total_amount'].toString());
+    }
+
+    final double advancedAmount = double.tryParse(invoiceData['paid_amount']?.toString() ?? '') ?? 0.0;
+    final double balanceAmount = (netTotal ?? 0.0) - advancedAmount;
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Center(
+                child: pw.Text("CAR INVOICE",
+                    style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Text("RENTOX CAR ",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+              pw.Text(
+                  "7, Jalaram Niwas, Ganesh Gawde Road, \nMulund (W), Mumbai - 400080",
+                  style: const pw.TextStyle(fontSize: 12)),
+              pw.Text(
+                  "Tel: 9619936999 | Email: agnicarrental@gmail.com \nWebsite: www.agnicarrental.com",
+                  style: const pw.TextStyle(fontSize: 12)),
+              pw.Text("GST No: 27AABPG5706A3ZB", style: const pw.TextStyle(fontSize: 12)),
+              pw.SizedBox(height: 8),
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text("Date: ${invoiceData['invoieceDate']}",
+                    style: const pw.TextStyle(fontSize: 12)),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Row(
+                children: [
+                  pw.Container(
+                      width: 100,
+                      child: pw.Text("Bill No:",
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
+                  pw.Expanded(child: pw.Text("${invoiceData['invoiceNumber']}", style: const pw.TextStyle(fontSize: 12))),
+                ],
+              ),
+              if (invoiceData['gst_number'] != 'Not Generated' &&
+                  invoiceData['gst_number'] != '') ...[
+                pw.Row(
+                  children: [
+                    pw.Container(
+                        width: 100,
+                        child: pw.Text("Business Name:",
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
+                    pw.Expanded(child: pw.Text(invoiceData['business_name']!, style: const pw.TextStyle(fontSize: 12))),
+                  ],
+                ),
+                pw.Row(
+                  children: [
+                    pw.Container(
+                        width: 100,
+                        child: pw.Text("Address:",
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
+                    pw.Expanded(child: pw.Text(invoiceData['business_address']!, style: const pw.TextStyle(fontSize: 12))),
+                  ],
+                ),
+                pw.Row(
+                  children: [
+                    pw.Container(
+                        width: 100,
+                        child: pw.Text("GST No:",
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
+                    pw.Expanded(child: pw.Text(invoiceData['gst_number']!, style: const pw.TextStyle(fontSize: 12))),
+                  ],
+                ),
+              ],
+              pw.SizedBox(height: 8),
+              pw.Row(
+                children: [
+                  pw.Container(
+                      width: 100,
+                      child: pw.Text("Passenger:",
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
+                  pw.Expanded(child: pw.Text(invoiceData['cus_name']!, style: const pw.TextStyle(fontSize: 12))),
+                ],
+              ),
+              pw.Row(
+                children: [
+                  pw.Container(
+                      width: 100,
+                      child: pw.Text("Trip Type:",
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
+                  pw.Expanded(child: pw.Text(invoiceData['trip_type']!, style: const pw.TextStyle(fontSize: 12))),
+                ],
+              ),
+              pw.Row(
+                children: [
+                  pw.Container(
+                      width: 100,
+                      child: pw.Text("Vehicle:",
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
+                  pw.Expanded(child: pw.Text(invoiceData['car_type']!, style: const pw.TextStyle(fontSize: 12))),
+                ],
+              ),
+              pw.Row(
+                children: [
+                  pw.Container(
+                      width: 100,
+                      child: pw.Text("From",
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
+                  pw.Expanded(child: pw.Text('${invoiceData['from']}', style: const pw.TextStyle(fontSize: 12))),
+                ],
+              ),
+              if (invoiceData['trip_type'] != 'Local-Duty') ...[
+                pw.Row(
+                  children: [
+                    pw.Container(
+                        width: 100,
+                        child: pw.Text("To ",
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
+                    pw.Expanded(child: pw.Text('${invoiceData['to']}', style: const pw.TextStyle(fontSize: 12))),
+                  ],
+                ),
+              ],
+              pw.Row(
+                children: [
+                  pw.Container(
+                      width: 100,
+                      child: pw.Text("Date:",
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
+                  pw.Expanded(child: pw.Text(invoiceData['starting_date']!, style: const pw.TextStyle(fontSize: 12))),
+                ],
+              ),
+              pw.SizedBox(height: 12),
+              pw.Table(
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(3),
+                  1: const pw.FlexColumnWidth(3),
+                  2: const pw.FlexColumnWidth(2),
+                },
+                border: pw.TableBorder.all(),
+                children: [
+                  _buildPdfTableRow('Starting Date', dateFormat.format(startDateTime), ''),
+                  _buildPdfTableRow('Ending Date', dateFormat.format(endDateTime), ''),
+
+                  if (invoiceData['trip_type'] == 'Local-Duty' ||
+                      invoiceData['trip_type'] == 'Round-Trip') ...[
+                    _buildPdfTableRow('Starting Km ', invoiceData['starting_km']!, ''),
+                    _buildPdfTableRow('Ending Km ', invoiceData['closing_km']!, ''),
+                    _buildPdfTableRow('Total Km', totalKm.toStringAsFixed(2), ''),
+                  ],
+                  if (invoiceData['trip_type'] == 'Local-Duty') ...[
+                    _buildPdfTableRow(
+                        'Package',
+                        '${invoiceData['packageHours'].toString()} Hours - ${invoiceData['packageKm'].toString()} Km',
+                        '$packageBaseWithCommission'),
+                    _buildPdfTableRow(
+                        'Extra Km',
+                        'Rs ${invoiceData['extra_km_price']} *  $extraKm Km ',
+                        '$extrakmAmount'),
+                    _buildPdfTableRow(
+                        'Extra Hrs',
+                        'Rs ${invoiceData['extra_hours_price']} * $extraHours Hrs',
+                        '$extraHoursAmount'),
+                  ],
+                  if (invoiceData['trip_type'] == 'Round-Trip') ...[
+                    _buildPdfTableRow(
+                        'Total Km charge', '$maxKm x $kmRate $commission', '$baceAmount'),
+                    _buildPdfTableRow('Total Days', '$totalDays', ''),
+                  ],
+
+                  _buildPdfTableRow('Parking', '', '$parking_charge'),
+                  _buildPdfTableRow('Toll', '', '$toll_charge'),
+                  _buildPdfTableRow('Permit Charge', '', '$permit_charge'),
+                  _buildPdfTableRow('Driver Allowance', '', '${driver_allowance ?? ""} '),
+
+                  if (invoiceData['trip_type'] == 'One-way') ...[
+                    _buildPdfTableRow('Base Amount', '', '${base_charge.toStringAsFixed(2)}'),
+                    _buildPdfTableRow('Agent Commission', '', '${agent_commission.toStringAsFixed(2)}'),
+                    _buildPdfTableRow('Total Charge', '', '$baceAmount')
+                  ],
+
+                  if (invoiceData['trip_type'] != 'Local-taxi') ...[
+                    _buildPdfTableRow('GSTIN', '27AABPG5706A3ZB', ''),
+                    _buildPdfTableRow('GST $gstPercent%', '', '$gst'),
+                  ],
+
+                  _buildPdfTableRow('TOTAL', '', '$netTotal'),
+                  _buildPdfTableRow('Advanced Amount', '', '${advancedAmount.toStringAsFixed(2)}'),
+                  _buildPdfTableRow('Balance Amount', '', '${balanceAmount.toStringAsFixed(2)}'),
+                ],
+              ),
+              if (userType == 'agent') ...[
+                pw.SizedBox(height: 4),
+                pw.Text("Agent Commission is included in the above amount",
+                    style: const pw.TextStyle(fontSize: 10)),
+              ],
+              pw.SizedBox(height: 12),
+              pw.Text("Bank Details:",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+              pw.Text("Federal Bank", style: const pw.TextStyle(fontSize: 12)),
+              pw.Text("RENTOX CAR ", style: const pw.TextStyle(fontSize: 12)),
+              pw.Text("A/c No.: 15390200008421", style: const pw.TextStyle(fontSize: 12)),
+              pw.Text("IFSC CODE: FDRL0001539", style: const pw.TextStyle(fontSize: 12)),
+              pw.SizedBox(height: 20),
+              pw.Text("Authorized Sign.", style: const pw.TextStyle(fontSize: 12)),
+              pw.SizedBox(height: 8),
+              pw.Text(
+                  "Kindly issue a crossed cheque in favour of AGNI CAR RENTAL \"Subject To Mumbai Jurisdiction\"",
+                  style: const pw.TextStyle(fontSize: 10)),
+            ],
+          );
+        },
+      ),
+    );
+    return pdf;
+  }
+
+  Future<void> _sharePDF(BuildContext context) async {
+    try {
+      final pdf = await _generateDocument();
+      final outputDir = await getTemporaryDirectory();
+      final file = File("${outputDir.path}/invoice_${widget.bookingId}.pdf");
+      await file.writeAsBytes(await pdf.save());
+      
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Invoice for Booking #${widget.bookingId}',
+      );
+    } catch (e) {
+      print("Error sharing: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error sharing invoice: $e")),
+      );
+    }
+  }
+
+  Future<void> _savePDF(BuildContext context) async {
+    try {
+      final pdf = await _generateDocument();
+      
+      Directory? targetDir;
+      if (Platform.isAndroid) {
+        targetDir = Directory('/storage/emulated/0/Download');
+        if (!await targetDir.exists()) {
+          targetDir = await getExternalStorageDirectory();
+        }
+      } else {
+        targetDir = await getApplicationDocumentsDirectory();
+      }
+
+      final fileName = "invoice_${widget.bookingId}.pdf";
+      final file = File("${targetDir!.path}/$fileName");
+      await file.writeAsBytes(await pdf.save());
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("✅ Invoice saved to: ${file.path}"),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: "OPEN",
+            textColor: Colors.white,
+            onPressed: () {
+              OpenFile.open(file.path);
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      print("Error saving: $e");
+      try {
+        final pdf = await _generateDocument();
+        final targetDir = await getApplicationDocumentsDirectory();
+        final file = File("${targetDir.path}/invoice_${widget.bookingId}.pdf");
+        await file.writeAsBytes(await pdf.save());
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("Saved to app folder. Tap to view invoice."),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: "VIEW",
+              textColor: Colors.white,
+              onPressed: () {
+                OpenFile.open(file.path);
+              },
+            ),
+          ),
+        );
+      } catch (ex) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error saving invoice: $ex")),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Invoice"),
-        // actions: [
-        //   IconButton(
-        //     icon: Icon(Icons.download),
-        //     onPressed: () => _downloadPDF(context),
-        //   ),
-        // ],
+        title: const Text("Invoice"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.save_alt),
+            tooltip: "Save Invoice",
+            onPressed: () => _savePDF(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: "Share Invoice",
+            onPressed: () => _sharePDF(context),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(12.0),
@@ -202,6 +707,7 @@ class _InvoicePageState extends State<InvoicePage> {
         ],
         SizedBox(height: 8),
         _buildRow("Passenger:", invoiceData['cus_name']!),
+        _buildRow("Trip Type:", invoiceData['trip_type']!),
         _buildRow("Vehicle:", invoiceData['car_type']!),
         _buildRow("From", '${invoiceData['from']}'),
         if (invoiceData['trip_type'] != 'Local-Duty') ...[
@@ -294,8 +800,7 @@ class _InvoicePageState extends State<InvoicePage> {
           double.tryParse(invoiceData['extra_hours_price'] ?? '0') ?? 0;
       final packageBaseFare =
           double.tryParse(invoiceData['packageBaseFare'] ?? '0') ?? 0;
-      double driverAllowance =
-          double.tryParse(invoiceData['driver_allowance'] ?? '0') ?? 0;
+      double driverAllowance = 0.0;
 
       // Extra km
       extraKm = totalKm > packageKm ? totalKm - packageKm : 0;
@@ -338,6 +843,7 @@ class _InvoicePageState extends State<InvoicePage> {
       totalBeforeGst = double.parse(totalBeforeGst.toStringAsFixed(2));
       gst = double.parse(gst.toStringAsFixed(2));
       netTotal = double.parse(netTotal.toStringAsFixed(2));
+      driver_allowance = driverAllowance.toString();
     }
 
     if (invoiceData['trip_type'] == 'Round-Trip') {
@@ -404,6 +910,7 @@ class _InvoicePageState extends State<InvoicePage> {
           driver_allowanceXdays;
     }
 
+    double base_charge = 0.0;
     if (invoiceData['trip_type'] == 'One-way') {
       double distance = double.parse(invoiceData['distance'].toString());
       double driver_allowance;
@@ -419,6 +926,11 @@ class _InvoicePageState extends State<InvoicePage> {
       gst = baceAmount * gstPercent / 100;
       netTotal = baceAmount + gst + parking_charge;
 
+      base_charge = double.tryParse(invoiceData['base_charge']?.toString() ?? '') ?? 0.0;
+      if (base_charge == 0.0) {
+        base_charge = baceAmount - agent_commission;
+      }
+
       // Format all values to 2 decimal places
       baceAmount = double.parse(baceAmount.toStringAsFixed(2));
       totalbeforeGst = double.parse(totalbeforeGst.toStringAsFixed(2));
@@ -429,6 +941,9 @@ class _InvoicePageState extends State<InvoicePage> {
     if (invoiceData['trip_type'] == 'Local-taxi') {
       netTotal = double.parse(invoiceData['total_amount'].toString());
     }
+
+    final double advancedAmount = double.tryParse(invoiceData['paid_amount']?.toString() ?? '') ?? 0.0;
+    final double balanceAmount = (netTotal ?? 0.0) - advancedAmount;
 
     return Table(
       columnWidths: {
@@ -473,6 +988,8 @@ class _InvoicePageState extends State<InvoicePage> {
         _buildTableRow('Driver Allowance', '', '${driver_allowance ?? ""} '),
 
         if (invoiceData['trip_type'] == 'One-way') ...[
+          _buildTableRow('Base Amount', '', '${base_charge.toStringAsFixed(2)}'),
+          _buildTableRow('Agent Commission', '', '${agent_commission.toStringAsFixed(2)}'),
           _buildTableRow('Total Charge', '', '$baceAmount')
         ],
 
@@ -482,6 +999,8 @@ class _InvoicePageState extends State<InvoicePage> {
         ],
 
         _buildTableRow('TOTAL', '', '$netTotal'),
+        _buildTableRow('Advanced Amount', '', '${advancedAmount.toStringAsFixed(2)}'),
+        _buildTableRow('Balance Amount', '', '${balanceAmount.toStringAsFixed(2)}'),
 
         //   _buildTableRow('IGST 5%', '', '₹${igst.toStringAsFixed(2)}'),
         //   _buildTableRow('Total', '', '₹${totalAmt.toStringAsFixed(2)}'),

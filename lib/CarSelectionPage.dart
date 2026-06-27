@@ -55,6 +55,9 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
   List<Car> cars = [];
   Map<String, dynamic> discountData = {};
   int discountPercentage = 0;
+  String discountType = 'percentage';
+  double discountValue = 0.0;
+  String discountName = 'Loyalty';
 
   @override
   void didChangeDependencies() {
@@ -129,6 +132,9 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
         setState(() {
           discountData = data;
           discountPercentage = data['discount_percentage'] ?? 0;
+          discountType = data['discount_type'] ?? 'percentage';
+          discountValue = double.tryParse(data['discount_value']?.toString() ?? '0') ?? 0.0;
+          discountName = data['discount_name'] ?? 'Loyalty';
         });
       }
     } catch (e) {
@@ -218,13 +224,23 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
                           car.name.toLowerCase() == "hatchback")
                         return const SizedBox.shrink();
 
-                      double totalPrice = (car.price * numericDistance * 1.05) +
+                      double standardPrice = (car.price * numericDistance * 1.05) +
                           baseCharge +
                           (commissionAmount * 1.05);
                       double partPay = (car.price * numericDistance * 0.20) +
                           (commissionAmount * 1.05);
-                      double discountedPrice = totalPrice +
-                          (totalPrice * (discountPercentage / 100));
+                      
+                      double savings = 0.0;
+                      if (discountValue > 0) {
+                        if (discountType == 'fixed') {
+                          savings = discountValue;
+                        } else {
+                          savings = standardPrice * (discountValue / 100);
+                        }
+                      }
+                      
+                      double totalPrice = (standardPrice - savings) < 0 ? 0.0 : (standardPrice - savings);
+                      double discountedPrice = standardPrice;
 
                       return _buildModernCarCard(
                         car: car,
@@ -419,13 +435,15 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
                                           fontSize: 22,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.green.shade700)),
-                                  const SizedBox(width: 8),
-                                  Text("₹${discountedPrice.toStringAsFixed(0)}",
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey,
-                                          decoration:
-                                              TextDecoration.lineThrough)),
+                                  if (savings > 0) ...[
+                                    const SizedBox(width: 8),
+                                    Text("₹${discountedPrice.toStringAsFixed(0)}",
+                                        style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey,
+                                            decoration:
+                                                TextDecoration.lineThrough)),
+                                  ],
                                 ],
                               ),
                               Text("Inclusive of Driver TA & Tolls",
@@ -434,65 +452,68 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
                                       color: Colors.grey.shade500)),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFFFFF8E1), // light amber/gold
-                                  Color(0xFFFFECB3), // slightly deeper amber/gold
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFFFD54F), // accent yellow/gold border
-                                width: 1.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFFFFB300).withOpacity(0.1),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                )
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.stars_rounded,
-                                  color: Color(0xFFFF8F00), // dark amber/orange gold
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 8),
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      "SAVE ₹${savings.toStringAsFixed(0)}",
-                                      style: GoogleFonts.poppins(
-                                        color: const Color(0xFFE65100), // deep warm orange/gold
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      "Loyalty ${discountPercentage}% OFF",
-                                      style: GoogleFonts.poppins(
-                                        color: const Color(0xFFFF6F00),
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                          if (savings > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFFFF8E1), // light amber/gold
+                                    Color(0xFFFFECB3), // slightly deeper amber/gold
                                   ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
-                              ],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFFFFD54F), // accent yellow/gold border
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFFB300).withOpacity(0.1),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  )
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.stars_rounded,
+                                    color: Color(0xFFFF8F00), // dark amber/orange gold
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "SAVE ₹${savings.toStringAsFixed(0)}",
+                                        style: GoogleFonts.poppins(
+                                          color: const Color(0xFFE65100), // deep warm orange/gold
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        discountType == 'fixed'
+                                            ? "$discountName ₹${discountValue.toStringAsFixed(0)} OFF"
+                                            : "$discountName ${discountValue.toStringAsFixed(0)}% OFF",
+                                        style: GoogleFonts.poppins(
+                                          color: const Color(0xFFFF6F00),
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ],

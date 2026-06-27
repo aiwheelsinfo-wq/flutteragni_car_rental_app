@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:agni_car_rental/config/api_config.dart';
-import 'BookingCustomerMessagePage.dart';
+import 'RazorpayPaymentPage.dart';
 
 class ShowBillPage extends StatefulWidget {
   final String carType;
@@ -130,7 +130,16 @@ class _ShowBillPageState extends State<ShowBillPage> {
 
   Future<void> _submitBooking() async {
     setState(() => _isWaiting = true);
-    double vendorAmount = widget.totalAmount - widget.partPay;
+    
+    double tripFare = widget.totalAmount;
+    double advanceAmount = tripFare * 0.25;
+    double gstAmount = tripFare * 0.05;
+    double payableNow = advanceAmount + gstAmount;
+
+    // Vendor Earnings = 90% of Total Trip Amount
+    double vendorEarnings = tripFare * 0.90;
+    // Platform Commission = 10% of Total Trip Amount
+    double platformCommission = tripFare * 0.10;
 
     var url = Uri.parse("${ApiConfig.baseUrl}/saveBooking.php");
     try {
@@ -150,11 +159,11 @@ class _ShowBillPageState extends State<ShowBillPage> {
         "driver_ta": widget.driverTa.toString(),
         "toll_charge": widget.tollCharge.toString(),
         "total_amount": widget.totalAmount.toString(),
-        "payment_type": "Confirm",
+        "payment_type": "Advance",
         "agent_commission": widget.commission.toString(),
         "city": cityController.text,
-        "agni_amount": widget.partPay.toString(),
-        "vendor_amount": vendorAmount.toString(),
+        "agni_amount": platformCommission.toStringAsFixed(2),
+        "vendor_amount": vendorEarnings.toStringAsFixed(2),
         "user_type": userType,
         "customer_mob": customerMobController.text,
         'gst': _showGSTField.toString(),
@@ -168,10 +177,15 @@ class _ShowBillPageState extends State<ShowBillPage> {
       var responseData = json.decode(response.body);
 
       if (responseData["success"] == true) {
+        String createdBookingId = responseData["booking_id"]?.toString() ?? widget.bookingId;
         Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-                builder: (context) => BookingCustomerMessagePage()));
+                builder: (context) => RazorpayPaymentPage(
+                      bookingId: createdBookingId,
+                      amount: payableNow,
+                      isFullPay: false,
+                    )));
       } else {
         throw Exception();
       }
@@ -186,6 +200,11 @@ class _ShowBillPageState extends State<ShowBillPage> {
 
   void _showBookingConfirmationDialog() {
     if (!_formKey.currentState!.validate()) return;
+
+    double tripFare = widget.totalAmount;
+    double advanceAmount = tripFare * 0.25;
+    double gstAmount = tripFare * 0.05;
+    double payableNow = advanceAmount + gstAmount;
 
     showModalBottomSheet(
       context: context,
@@ -203,11 +222,11 @@ class _ShowBillPageState extends State<ShowBillPage> {
                     color: Colors.grey[300],
                     borderRadius: BorderRadius.circular(10))),
             const SizedBox(height: 20),
-            Text("Confirm Ride",
+            Text("Confirm Advance Payment",
                 style: GoogleFonts.poppins(
                     fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            Text("Are you sure you want to book this ${widget.carType} trip?",
+            Text("You are paying ₹${payableNow.toStringAsFixed(2)} (25% Advance + 5% GST) to book this ${widget.carType} trip.",
                 textAlign: TextAlign.center),
             const SizedBox(height: 20),
             Row(
@@ -233,8 +252,8 @@ class _ShowBillPageState extends State<ShowBillPage> {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text("Yes, Book Now",
-                        style: TextStyle(color: Colors.black)),
+                    child: const Text("Pay Now",
+                        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -387,15 +406,78 @@ class _ShowBillPageState extends State<ShowBillPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("Total Amount",
+                    Text("Total Trip Fare",
                         style: GoogleFonts.poppins(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
+                            fontSize: 15, fontWeight: FontWeight.bold, color: Colors.grey[700])),
                     Text("₹${widget.totalAmount.toStringAsFixed(2)}",
                         style: GoogleFonts.poppins(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.green[700])),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black)),
                   ],
+                ),
+                const SizedBox(height: 15),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.amber[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "ADVANCE PAYMENT BREAKDOWN",
+                        style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                            color: Colors.amber[900]),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildFareRow("Advance (25%)", widget.totalAmount * 0.25),
+                      _buildFareRow("GST (5%)", widget.totalAmount * 0.05),
+                      const Divider(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text("Payable Now (30%)",
+                                style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green[800])),
+                          ),
+                          const SizedBox(width: 8),
+                          Text("₹${(widget.totalAmount * 0.30).toStringAsFixed(2)}",
+                              style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.green[800])),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text("Remaining Balance (75%)",
+                                style: GoogleFonts.poppins(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[600])),
+                          ),
+                          const SizedBox(width: 8),
+                          Text("₹${(widget.totalAmount * 0.75).toStringAsFixed(2)}",
+                              style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[700])),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -443,7 +525,10 @@ class _ShowBillPageState extends State<ShowBillPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+          Expanded(
+            child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+          ),
+          const SizedBox(width: 8),
           Text("₹${amount.toStringAsFixed(0)}",
               style: const TextStyle(fontWeight: FontWeight.w500)),
         ],
@@ -567,6 +652,11 @@ class _ShowBillPageState extends State<ShowBillPage> {
   }
 
   Widget _buildConfirmButton() {
+    double tripFare = widget.totalAmount;
+    double advanceAmount = tripFare * 0.25;
+    double gstAmount = tripFare * 0.05;
+    double payableNow = advanceAmount + gstAmount;
+
     return SizedBox(
       width: double.infinity,
       height: 60,
@@ -583,8 +673,8 @@ class _ShowBillPageState extends State<ShowBillPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text("CONFIRM BOOKING",
-                style: TextStyle(
+            Text("PAY ADVANCE ₹${payableNow.toStringAsFixed(0)}",
+                style: const TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
                     letterSpacing: 1)),

@@ -314,21 +314,63 @@ class _LocalTaxiState extends State<LocalTaxi> {
 ]
 ''';
 
-  bool _checkCityBoundary(LatLng latLng, String address) {
-    // Bounding Box limits for Pune City
-    const double minLat = 18.4100;
-    const double maxLat = 18.6500;
-    const double minLng = 73.7200;
-    const double maxLng = 73.9800;
+  static const List<Map<String, dynamic>> majorCities = [
+    {"name": "Pune", "minLat": 18.4100, "maxLat": 18.6500, "minLng": 73.7200, "maxLng": 73.9800},
+    {"name": "Mumbai", "minLat": 18.8900, "maxLat": 19.3000, "minLng": 72.7500, "maxLng": 73.0200},
+    {"name": "Nashik", "minLat": 19.9000, "maxLat": 20.1000, "minLng": 73.7000, "maxLng": 73.8800},
+    {"name": "Nagpur", "minLat": 21.0500, "maxLat": 21.2200, "minLng": 79.0000, "maxLng": 79.1800},
+    {"name": "Aurangabad", "minLat": 19.8200, "maxLat": 19.9500, "minLng": 75.2500, "maxLng": 75.4200},
+    {"name": "Kolhapur", "minLat": 16.6500, "maxLat": 16.7500, "minLng": 74.2000, "maxLng": 74.2800},
+    {"name": "Solapur", "minLat": 17.6200, "maxLat": 17.7200, "minLng": 75.8500, "maxLng": 75.9500},
+  ];
 
-    bool withinCoords = (latLng.latitude >= minLat && latLng.latitude <= maxLat) &&
-                         (latLng.longitude >= minLng && latLng.longitude <= maxLng);
-    
-    bool containsPune = address.toLowerCase().contains('pune');
-    return withinCoords || containsPune;
+  Map<String, dynamic>? _detectCity(LatLng point, String address) {
+    for (var city in majorCities) {
+      bool withinCoords = (point.latitude >= city["minLat"] && point.latitude <= city["maxLat"]) &&
+                           (point.longitude >= city["minLng"] && point.longitude <= city["maxLng"]);
+      bool containsName = address.toLowerCase().contains(city["name"].toString().toLowerCase());
+      if (withinCoords || containsName) {
+        return city;
+      }
+    }
+    return null;
   }
 
-  void _showBoundaryError(String locationType) {
+  bool _isPointInCity(LatLng point, String address, Map<String, dynamic> city) {
+    bool withinCoords = (point.latitude >= city["minLat"] && point.latitude <= city["maxLat"]) &&
+                         (point.longitude >= city["minLng"] && point.longitude <= city["maxLng"]);
+    bool containsName = address.toLowerCase().contains(city["name"].toString().toLowerCase());
+    return withinCoords || containsName;
+  }
+
+  void _showOutsideServiceAreaDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            "Service Unavailable",
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.red),
+          ),
+          content: Text(
+            "Local Cab services are only available within Pune, Mumbai, Nashik, Nagpur, Aurangabad, Kolhapur, and Solapur city limits. Your pickup location falls outside these areas. Please select One-Way or Round-Trip for your journey.",
+            style: GoogleFonts.poppins(),
+          ),
+          actions: [
+            TextButton(
+              child: Text(
+                "OK",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: const Color(0xFFFFB300)),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showBoundaryError(String cityName) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -338,7 +380,7 @@ class _LocalTaxiState extends State<LocalTaxi> {
             style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.red),
           ),
           content: Text(
-            "Your selected $locationType is outside Pune city limits. Local Taxi bookings are restricted strictly within Pune City limits. For longer trips, please use our One-Way service.",
+            "Your drop location is outside $cityName city limits. Local Taxi bookings must start and end within the same city limits. Please use our One-Way or Round-Trip service for travel outside $cityName.",
             style: GoogleFonts.poppins(),
           ),
           actions: [
@@ -357,16 +399,19 @@ class _LocalTaxiState extends State<LocalTaxi> {
 
   void _proceed() {
     if (selectedCar.isEmpty) return;
+    if (fromLatLng == null) return;
 
-    // Validate Pune City Limits for Pickup Address
-    if (fromLatLng != null && !_checkCityBoundary(fromLatLng!, fullAddress)) {
-      _showBoundaryError("Pickup location");
+    // 1. Detect which city boundary pickup lies in
+    Map<String, dynamic>? detectedCity = _detectCity(fromLatLng!, fullAddress);
+
+    if (detectedCity == null) {
+      _showOutsideServiceAreaDialog();
       return;
     }
 
-    // Validate Pune City Limits for Drop Address
-    if (toLatLng != null && !_checkCityBoundary(toLatLng!, toController.text)) {
-      _showBoundaryError("Drop location");
+    // 2. Validate that drop address is inside the SAME city
+    if (toLatLng != null && !_isPointInCity(toLatLng!, toController.text, detectedCity)) {
+      _showBoundaryError(detectedCity["name"]);
       return;
     }
 

@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart'; // Added for location detection
 import 'package:agni_car_rental/config/api_config.dart';
 import 'BookingCustomerMessagePage.dart';
+import 'RazorpayPaymentPage.dart';
 
 // --- MODELS ---
 class Car {
@@ -114,6 +115,9 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
     super.initState();
     fetchApiKey();
     fetchCars();
+    commissionController.addListener(() {
+      if (mounted) setState(() {});
+    });
     // Initialize with passed location, otherwise it will be updated by getCurrentLocation
     if (widget.fromLocation.isNotEmpty) {
       locationController.text = widget.fromLocation;
@@ -281,6 +285,10 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
             "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}";
       }
 
+      double basePrice = selectedCar?.base ?? 0.0;
+      double agentCommission = double.tryParse(commissionController.text) ?? 0.0;
+      double totalAmt = basePrice + agentCommission;
+
       final data = {
         'trip_type': 'Local-Duty',
         'from_address': locationController.text,
@@ -297,9 +305,10 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
         'agent_commission': commissionController.text,
         'customer_mob': customerNumberController.text,
         'user_type': userType,
-        'total_amount': (selectedCar?.base ?? 0).toString(),
+        'total_amount': totalAmt.toString(),
         'vendor_amount': (selectedCar?.driverRate ?? 0).toString(),
         'agni_amount': (selectedCar?.agni_share ?? 0).toString(),
+        'payment_type': 'Advance',
         'gst': showGSTField.toString(),
         'gst_number': gstNumberController.text,
         'business_name': businessNameController.text,
@@ -311,11 +320,21 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
           Uri.parse('${ApiConfig.baseUrl}/saveBooking.php'),
           body: data);
 
-      if (response.statusCode == 200 && response.body.contains("success")) {
-        Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const BookingCustomerMessagePage()));
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData["success"] == true) {
+          String createdBookingId = responseData["booking_id"]?.toString() ?? '';
+          Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => RazorpayPaymentPage(
+                        bookingId: createdBookingId,
+                        amount: 200.0,
+                        isFullPay: false,
+                      )));
+        } else {
+          _showSnack("Booking failed. Try again.");
+        }
       } else {
         _showSnack("Booking failed. Try again.");
       }
@@ -548,8 +567,9 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
 
   Widget _buildFareBreakdown() {
     final double originalPrice = selectedCar!.discountedPrice;
-    final double finalPrice = selectedCar!.base;
-    final double savings = originalPrice - finalPrice;
+    final double agentCommission = double.tryParse(commissionController.text) ?? 0.0;
+    final double finalPrice = selectedCar!.base + agentCommission;
+    final double savings = originalPrice - selectedCar!.base;
     final bool hasDiscount = savings > 0;
 
     return Container(
@@ -794,7 +814,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text("CONFIRM BOOKING",
+                  const Text("PAY ADVANCE ₹200",
                       style: TextStyle(
                           fontWeight: FontWeight.w900, letterSpacing: 1.2)),
                   const SizedBox(width: 10),

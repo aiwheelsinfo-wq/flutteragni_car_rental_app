@@ -252,6 +252,10 @@ class _RoundtripcarselectionState extends State<Roundtripcarselection> {
               returnDate: args['return_date'],
               returnTime: args['return_time'],
               selectedCar: car.name,
+              kmPerDay: car.kmPerDay,
+              kmRate: car.price,
+              driverAllowance: car.driverAllowance,
+              gstPercent: car.gstPercent,
             ),
           ),
         );

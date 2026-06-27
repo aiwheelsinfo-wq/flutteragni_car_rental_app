@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:agni_car_rental/config/api_config.dart';
 import 'BookingCustomerMessagePage.dart';
+import 'RazorpayPaymentPage.dart';
 
 class RoundTripShowBill extends StatefulWidget {
   final String from;
@@ -16,6 +17,10 @@ class RoundTripShowBill extends StatefulWidget {
   final String returnDate;
   final String returnTime;
   final String selectedCar;
+  final double kmPerDay;
+  final double kmRate;
+  final double driverAllowance;
+  final double gstPercent;
 
   const RoundTripShowBill({
     Key? key,
@@ -26,6 +31,10 @@ class RoundTripShowBill extends StatefulWidget {
     required this.returnDate,
     required this.returnTime,
     required this.selectedCar,
+    required this.kmPerDay,
+    required this.kmRate,
+    required this.driverAllowance,
+    required this.gstPercent,
   }) : super(key: key);
 
   @override
@@ -137,6 +146,10 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
     String formatTo24(String time) =>
         DateFormat("HH:mm").format(DateFormat("hh:mm a").parse(time));
 
+    double dailyLimit = widget.kmPerDay;
+    int days = _calculateDays();
+    double advanceAmount = dailyLimit * 2 * days;
+
     try {
       var url = Uri.parse("${ApiConfig.baseUrl}/saveBooking.php");
       var response = await http.post(url, body: {
@@ -154,18 +167,28 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
         "city": cityController.text,
         "pincode": pincodeController.text,
         "agent_commission": commissionController.text,
-        "payment_type": "Part",
+        "payment_type": "Advance",
         'gst': _showGSTField.toString(),
         'gst_number': gstController.text,
         'business_name': businessNameController.text,
         'business_address': businessAddressController.text,
         'business_pincode': businessPincodeController.text,
+        'total_amount': advanceAmount.toStringAsFixed(2),
+        'agni_amount': (advanceAmount * 0.10).toStringAsFixed(2),
+        'vendor_amount': (advanceAmount * 0.90).toStringAsFixed(2),
       });
 
       var res = json.decode(response.body);
       if (res["success"] == true) {
-        Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => BookingCustomerMessagePage()));
+        String createdBookingId = res["booking_id"]?.toString() ?? '';
+        Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (_) => RazorpayPaymentPage(
+                      bookingId: createdBookingId,
+                      amount: advanceAmount,
+                      isFullPay: false,
+                    )));
       } else {
         _showSnackBar(
             "Booking Failed: ${res['error'] ?? 'Unknown error'}", Colors.red);
@@ -184,16 +207,19 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
 
   int _calculateDays() {
     try {
-      DateTime dep = DateFormat('EEE, MMM d, yyyy h:mm a')
-          .parse('${widget.departureDate} ${widget.departureTime}');
-      DateTime ret = DateFormat('EEE, MMM d, yyyy h:mm a')
-          .parse('${widget.returnDate} ${widget.returnTime}');
-      int days = ret.difference(dep).inDays;
-      if (ret.difference(dep).inHours % 24 > 2)
-        days++; // Same day or extra hours
-      return days == 0 ? 1 : days;
-    } catch (e) {
-      return 1;
+      DateTime dep = DateFormat('dd MMM, yyyy').parse(widget.departureDate);
+      DateTime ret = DateFormat('dd MMM, yyyy').parse(widget.returnDate);
+      int days = ret.difference(dep).inDays + 1;
+      return days <= 0 ? 1 : days;
+    } catch (_) {
+      try {
+        DateTime dep = DateFormat('EEE, MMM d, yyyy').parse(widget.departureDate);
+        DateTime ret = DateFormat('EEE, MMM d, yyyy').parse(widget.returnDate);
+        int days = ret.difference(dep).inDays + 1;
+        return days <= 0 ? 1 : days;
+      } catch (e) {
+        return 1;
+      }
     }
   }
 
@@ -228,6 +254,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildJourneyCard(),
+                    _buildAdvancePaymentBreakdownCard(),
                     const SizedBox(height: 25),
                     _buildSectionLabel("TRAVELER INFORMATION"),
                     if (userType == 'agent') ...[
@@ -453,6 +480,10 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
   }
 
   Widget _buildBottomAction() {
+    double dailyLimit = widget.kmPerDay;
+    int days = _calculateDays();
+    double advancePayable = dailyLimit * 2 * days;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -487,13 +518,134 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
                   width: 20,
                   child: CircularProgressIndicator(
                       color: primaryAmber, strokeWidth: 2))
-              : Text("CONFIRM BOOKING",
+              : Text("CONFIRM & PAY ADVANCE: ₹${advancePayable.toStringAsFixed(0)}",
                   style: GoogleFonts.poppins(
                       color: primaryAmber,
                       fontWeight: FontWeight.bold,
                       fontSize: 16)),
         ),
       ),
+    );
+  }
+
+  Widget _buildAdvancePaymentBreakdownCard() {
+    double dailyLimit = widget.kmPerDay;
+    int days = _calculateDays();
+    double advancePayable = dailyLimit * 2 * days;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.amber.shade200, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "ADVANCE PAYMENT BREAKDOWN",
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+              color: Colors.amber[900],
+            ),
+          ),
+          const SizedBox(height: 15),
+          _buildBreakdownRow("Trip Type", "Round Trip"),
+          const Divider(height: 16),
+          _buildBreakdownRow("Number of Days", "$days Days"),
+          const Divider(height: 16),
+          _buildBreakdownRow("Daily KM Limit", "${widget.kmPerDay.toStringAsFixed(0)} KM/day",
+              subtitle: "(₹${widget.kmRate.toStringAsFixed(0)}/KM rate applies to actual KM)"),
+          const Divider(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  "Advance Payable Now",
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green[800],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "₹${advancePayable.toStringAsFixed(0)}",
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.green[800],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            "*Remaining balance will be calculated after trip completion by the driver based on actual running KM.",
+            style: GoogleFonts.poppins(
+              fontSize: 10,
+              color: Colors.grey[600],
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreakdownRow(String label, String value, {String? subtitle}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[700],
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    color: Colors.grey[500],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+      ],
     );
   }
 }
