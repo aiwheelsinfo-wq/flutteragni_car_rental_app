@@ -154,6 +154,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: Icon(Icons.edit_note_rounded, color: theme['primary']),
+            onPressed: () => _showEditProfileDialog(theme),
+          ),
+          IconButton(
             icon: Icon(Icons.logout_rounded, color: theme['primary']),
             onPressed: () => _showLogoutDialog(theme),
           )
@@ -413,6 +417,198 @@ class _UserProfilePageState extends State<UserProfilePage> {
             child: const Text("Yes, Logout"),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showEditProfileDialog(Map<String, dynamic> theme) {
+    final TextEditingController nameController =
+        TextEditingController(text: user?['name'] ?? '');
+    final TextEditingController emailController =
+        TextEditingController(text: user?['email'] ?? '');
+    final TextEditingController cityController =
+        TextEditingController(text: user?['city'] ?? '');
+    final TextEditingController pincodeController =
+        TextEditingController(text: user?['pincode'] ?? '');
+
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24)),
+              title: Row(
+                children: [
+                  Icon(Icons.edit_outlined, color: theme['primary']),
+                  const SizedBox(width: 10),
+                  Text(
+                    "Edit Profile",
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: theme['text'],
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildTextField(
+                      controller: nameController,
+                      label: "Full Name",
+                      icon: Icons.person_outline,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: emailController,
+                      label: "Email Address",
+                      icon: Icons.mail_outline,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: cityController,
+                      label: "City",
+                      icon: Icons.location_city_outlined,
+                      theme: theme,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: pincodeController,
+                      label: "Pincode",
+                      icon: Icons.pin_drop_outlined,
+                      theme: theme,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(context),
+                  child: Text(
+                    "Cancel",
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme['primary'],
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (nameController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Name cannot be empty")),
+                            );
+                            return;
+                          }
+                          setDialogState(() => isSaving = true);
+                          try {
+                            final updateUrl = Uri.parse(
+                                '${ApiConfig.baseUrl}/customer_reg.php');
+                            final updateResponse = await http.post(
+                              updateUrl,
+                              headers: {'Content-Type': 'application/json'},
+                              body: json.encode({
+                                'phone_number': savedNumber,
+                                'booking_number': user?['booking_number'] ?? '',
+                                'name': nameController.text.trim(),
+                                'email': emailController.text.trim(),
+                                'city': cityController.text.trim(),
+                                'pincode': pincodeController.text.trim(),
+                                'agency_name': user?['agency_name'] ?? '',
+                              }),
+                            );
+
+                            final resData = json.decode(updateResponse.body);
+                            if (resData['status'] == 'success' || updateResponse.statusCode == 200) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("Profile updated successfully"),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              fetchUserData();
+                            } else {
+                              setDialogState(() => isSaving = false);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(resData['message'] ?? "Update failed"),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setDialogState(() => isSaving = false);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("Error: ${e.toString()}"),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text("Save"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required Map<String, dynamic> theme,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: GoogleFonts.poppins(fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+        prefixIcon: Icon(icon, color: theme['primary'], size: 18),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: theme['primary'], width: 1.5),
+        ),
       ),
     );
   }
