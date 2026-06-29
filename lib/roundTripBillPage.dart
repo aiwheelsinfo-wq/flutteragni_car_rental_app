@@ -67,6 +67,12 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
   String? savedNumber;
   bool _showGSTField = false;
   bool _isLoading = false;
+  double _commissionRatePerKm = 0.0;
+
+  double _calculateAgentCommission() {
+    int days = _calculateDays();
+    return _commissionRatePerKm * 300 * days;
+  }
 
   @override
   void initState() {
@@ -148,7 +154,9 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
 
     double dailyLimit = widget.kmPerDay;
     int days = _calculateDays();
-    double advanceAmount = dailyLimit * 2 * days;
+    double baseAdvance = dailyLimit * 2 * days;
+    double calculatedCommission = _calculateAgentCommission();
+    double totalAdvance = baseAdvance + calculatedCommission;
 
     try {
       var url = Uri.parse("${ApiConfig.baseUrl}/saveBooking.php");
@@ -166,16 +174,16 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
         "userNumber": savedNumber ?? customerMobController.text,
         "city": cityController.text,
         "pincode": pincodeController.text,
-        "agent_commission": commissionController.text,
+        "agent_commission": calculatedCommission.toStringAsFixed(2),
         "payment_type": "Advance",
         'gst': _showGSTField.toString(),
         'gst_number': gstController.text,
         'business_name': businessNameController.text,
         'business_address': businessAddressController.text,
         'business_pincode': businessPincodeController.text,
-        'total_amount': advanceAmount.toStringAsFixed(2),
-        'agni_amount': (advanceAmount * 0.10).toStringAsFixed(2),
-        'vendor_amount': (advanceAmount * 0.90).toStringAsFixed(2),
+        'total_amount': totalAdvance.toStringAsFixed(2),
+        'agni_amount': (baseAdvance * 0.10).toStringAsFixed(2),
+        'vendor_amount': (baseAdvance * 0.90).toStringAsFixed(2),
       });
 
       var res = json.decode(response.body);
@@ -186,7 +194,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
             MaterialPageRoute(
                 builder: (_) => RazorpayPaymentPage(
                       bookingId: createdBookingId,
-                      amount: advanceAmount,
+                      amount: totalAdvance,
                       isFullPay: false,
                     )));
       } else {
@@ -280,9 +288,40 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
                       ],
                     ),
                     if (userType == "agent")
-                      _buildTextField(commissionController,
-                          "Your Commission (₹)", Icons.payments_outlined,
-                          isNum: true),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 18),
+                        child: DropdownButtonFormField<double>(
+                          value: _commissionRatePerKm,
+                          dropdownColor: Colors.white,
+                          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black87),
+                          decoration: InputDecoration(
+                            labelText: "Agent Commission (₹/KM)",
+                            labelStyle: GoogleFonts.poppins(color: Colors.grey[600], fontSize: 13),
+                            prefixIcon: const Icon(Icons.payments_outlined, color: primaryAmber, size: 20),
+                            filled: true,
+                            fillColor: surfaceGrey,
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide.none),
+                            focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: const BorderSide(color: primaryAmber, width: 1.5)),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 0.0, child: Text("₹0 / KM (No Commission)")),
+                            DropdownMenuItem(value: 1.0, child: Text("₹1 / KM")),
+                            DropdownMenuItem(value: 2.0, child: Text("₹2 / KM")),
+                            DropdownMenuItem(value: 3.0, child: Text("₹3 / KM")),
+                          ],
+                          onChanged: (val) {
+                            setState(() {
+                              _commissionRatePerKm = val ?? 0.0;
+                              double calculated = _calculateAgentCommission();
+                              commissionController.text = calculated.toStringAsFixed(0);
+                            });
+                          },
+                        ),
+                      ),
 
                     const SizedBox(height: 10),
                     _buildGSTToggle(),
@@ -482,7 +521,9 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
   Widget _buildBottomAction() {
     double dailyLimit = widget.kmPerDay;
     int days = _calculateDays();
-    double advancePayable = dailyLimit * 2 * days;
+    double baseAdvance = dailyLimit * 2 * days;
+    double calculatedCommission = _calculateAgentCommission();
+    double totalAdvancePayable = baseAdvance + calculatedCommission;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -518,7 +559,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
                   width: 20,
                   child: CircularProgressIndicator(
                       color: primaryAmber, strokeWidth: 2))
-              : Text("CONFIRM & PAY ADVANCE: ₹${advancePayable.toStringAsFixed(0)}",
+              : Text("CONFIRM & PAY ADVANCE: ₹${totalAdvancePayable.toStringAsFixed(0)}",
                   style: GoogleFonts.poppins(
                       color: primaryAmber,
                       fontWeight: FontWeight.bold,
@@ -531,7 +572,9 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
   Widget _buildAdvancePaymentBreakdownCard() {
     double dailyLimit = widget.kmPerDay;
     int days = _calculateDays();
-    double advancePayable = dailyLimit * 2 * days;
+    double baseAdvance = dailyLimit * 2 * days;
+    double calculatedCommission = _calculateAgentCommission();
+    double totalAdvancePayable = baseAdvance + calculatedCommission;
 
     return Container(
       margin: const EdgeInsets.only(top: 20),
@@ -567,13 +610,23 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
           const Divider(height: 16),
           _buildBreakdownRow("Daily KM Limit", "${widget.kmPerDay.toStringAsFixed(0)} KM/day",
               subtitle: "(₹${widget.kmRate.toStringAsFixed(0)}/KM rate applies to actual KM)"),
+          const Divider(height: 16),
+          _buildBreakdownRow("Base Advance Fare", "₹${baseAdvance.toStringAsFixed(0)}"),
+          if (userType == "agent") ...[
+            const Divider(height: 16),
+            _buildBreakdownRow(
+              "Agent Commission",
+              "₹${calculatedCommission.toStringAsFixed(0)}",
+              subtitle: "(₹${_commissionRatePerKm.toStringAsFixed(0)}/KM x 300 KM/day x $days days)",
+            ),
+          ],
           const Divider(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Text(
-                  "Advance Payable Now",
+                  "Total Advance Payable Now",
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -583,7 +636,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
               ),
               const SizedBox(width: 8),
               Text(
-                "₹${advancePayable.toStringAsFixed(0)}",
+                "₹${totalAdvancePayable.toStringAsFixed(0)}",
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
