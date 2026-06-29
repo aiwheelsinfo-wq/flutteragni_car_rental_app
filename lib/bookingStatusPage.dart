@@ -379,12 +379,54 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if ((booking['trip_type'] ?? '') != 'Round-Trip' || status == 'Completed')
-                      Text("₹${booking['total_amount']}",
-                          style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 18,
-                              color: Colors.yellow[800])),
+                    Builder(builder: (context) {
+                      // For Round-Trip completed: calculate actual total dynamically
+                      if ((booking['trip_type'] ?? '') == 'Round-Trip' && status == 'Completed') {
+                        int rtDays = 1;
+                        try {
+                          final s = booking['date']?.toString() ?? '';
+                          final r = booking['return_date']?.toString() ?? '';
+                          if (s.isNotEmpty && r.isNotEmpty && s != '0000-00-00' && r != '0000-00-00') {
+                            try {
+                              rtDays = DateFormat('dd MMM yyyy').parse(r).difference(DateFormat('dd MMM yyyy').parse(s)).inDays + 1;
+                            } catch (_) {
+                              rtDays = DateTime.parse(r).difference(DateTime.parse(s)).inDays + 1;
+                            }
+                          }
+                        } catch (_) {}
+                        if (rtDays <= 0) rtDays = 1;
+                        double rtDailyLimit = double.tryParse(booking['daily_limit']?.toString() ?? '0') ?? 0.0;
+                        double rtStartKm = double.tryParse(booking['starting_km']?.toString() ?? '0') ?? 0.0;
+                        double rtCloseKm = double.tryParse(booking['closing_km']?.toString() ?? '0') ?? 0.0;
+                        double rtRunKm = (rtCloseKm - rtStartKm).clamp(0, double.infinity);
+                        double rtMaxKm = max(rtRunKm, rtDailyLimit * rtDays);
+                        double rtKmRate = double.tryParse(booking['kmRate']?.toString() ?? '0') ?? 0.0;
+                        double rtComm = double.tryParse(booking['agent_commission']?.toString() ?? '0') ?? 0.0;
+                        double rtCommRate = (rtComm > 0 && rtDays > 0 && rtDailyLimit > 0) ? (rtComm / (rtDailyLimit * rtDays)).roundToDouble() : 0.0;
+                        double rtBase = rtMaxKm * (rtKmRate + rtCommRate);
+                        double rtGstPct = double.tryParse(booking['gstPercent']?.toString() ?? '0') ?? 0.0;
+                        double rtGst = rtBase * rtGstPct / 100;
+                        double rtPark = double.tryParse(booking['parking_charge']?.toString() ?? '0') ?? 0.0;
+                        double rtToll = double.tryParse(booking['toll_charge']?.toString() ?? '0') ?? 0.0;
+                        double rtPermit = double.tryParse(booking['permit_charge']?.toString() ?? '0') ?? 0.0;
+                        double rtAllowDay = double.tryParse(booking['driver_allowance']?.toString() ?? '0') ?? 0.0;
+                        double rtNet = rtBase + rtGst + rtPark + rtToll + rtPermit + (rtAllowDay * rtDays);
+                        return Text("₹${rtNet.toStringAsFixed(2)}",
+                            style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 18,
+                                color: Colors.yellow[800]));
+                      }
+                      // For non-Round-Trip or non-Completed: show stored total_amount
+                      if ((booking['trip_type'] ?? '') != 'Round-Trip' || status == 'Completed') {
+                        return Text("₹${booking['total_amount']}",
+                            style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 18,
+                                color: Colors.yellow[800]));
+                      }
+                      return const SizedBox.shrink();
+                    }),
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(
