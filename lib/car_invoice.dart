@@ -194,6 +194,7 @@ class _InvoicePageState extends State<InvoicePage> {
     final minutes = duration.inMinutes.remainder(60);
     String? commission;
     double? packageBaseWithCommission;
+    String commissionFormulaText = '';
     int? totalDays = 0;
     double? extraKm;
     double? extrakmAmount;
@@ -304,7 +305,17 @@ class _InvoicePageState extends State<InvoicePage> {
       driver_allowanceXdays = double.parse(driver_allowance) * days;
       driver_allowance = driver_allowanceXdays.toString();
       totalDays = days;
-      baceAmount = (maxKm ?? 0) * (kmRate) + agent_commission;
+
+      double commissionRate = 0.0;
+      if (agent_commission > 0 && days > 0 && daily_limit > 0) {
+        commissionRate = (agent_commission / (daily_limit * days)).roundToDouble();
+      }
+      double effectiveKmRate = kmRate + commissionRate;
+      baceAmount = (maxKm ?? 0) * effectiveKmRate;
+
+      commissionFormulaText = commissionRate > 0
+          ? '${kmRate.toStringAsFixed(1)} + ${commissionRate.toStringAsFixed(1)}'
+          : kmRate.toStringAsFixed(1);
 
       gst = baceAmount! * gstPercent / 100;
 
@@ -511,7 +522,7 @@ class _InvoicePageState extends State<InvoicePage> {
                   ],
                   if (invoiceData['trip_type'] == 'Round-Trip') ...[
                     _buildPdfTableRow(
-                        'Total Km charge', '$maxKm x $kmRate $commission', '$baceAmount'),
+                        'Total Km charge', '$maxKm x $commissionFormulaText', '$baceAmount'),
                     _buildPdfTableRow('Total Days', '$totalDays', ''),
                   ],
 
@@ -762,6 +773,7 @@ class _InvoicePageState extends State<InvoicePage> {
     final minutes = duration.inMinutes.remainder(60);
     String? commission;
     double? packageBaseWithCommission;
+    String commissionFormulaText = '';
     int? totalDays = 0;
     double? extraKm;
     double? extrakmAmount;
@@ -872,7 +884,17 @@ class _InvoicePageState extends State<InvoicePage> {
       driver_allowanceXdays = double.parse(driver_allowance) * days;
       driver_allowance = driver_allowanceXdays.toString();
       totalDays = days;
-      baceAmount = (maxKm ?? 0) * (kmRate) + agent_commission;
+
+      double commissionRate = 0.0;
+      if (agent_commission > 0 && days > 0 && daily_limit > 0) {
+        commissionRate = (agent_commission / (daily_limit * days)).roundToDouble();
+      }
+      double effectiveKmRate = kmRate + commissionRate;
+      baceAmount = (maxKm ?? 0) * effectiveKmRate;
+
+      commissionFormulaText = commissionRate > 0
+          ? '${kmRate.toStringAsFixed(1)} + ${commissionRate.toStringAsFixed(1)}'
+          : kmRate.toStringAsFixed(1);
 
       gst = baceAmount! * gstPercent / 100;
 
@@ -952,7 +974,7 @@ class _InvoicePageState extends State<InvoicePage> {
         ],
         if (invoiceData['trip_type'] == 'Round-Trip') ...[
           _buildTableRow(
-              'Total Km charge', '$maxKm x $kmRate $commission', '$baceAmount'),
+              'Total Km charge', '$maxKm x $commissionFormulaText', '$baceAmount'),
           _buildTableRow('Total Days', '$totalDays', ''),
         ],
 
