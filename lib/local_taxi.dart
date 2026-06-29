@@ -342,12 +342,53 @@ class _LocalTaxiState extends State<LocalTaxi> {
     }
   }
 
+  bool _isPointInPolygon(LatLng point, String polygonCoordsJson) {
+    if (polygonCoordsJson.isEmpty) return true; // Fallback to bounding box only
+    try {
+      final List<dynamic> coords = jsonDecode(polygonCoordsJson);
+      if (coords.isEmpty) return true;
+
+      final List<LatLng> polygon = coords.map((c) {
+        return LatLng(
+          double.parse(c['lat'].toString()),
+          double.parse(c['lng'].toString()),
+        );
+      }).toList();
+
+      int i, j = polygon.length - 1;
+      bool oddNodes = false;
+      double x = point.longitude;
+      double y = point.latitude;
+
+      for (i = 0; i < polygon.length; i++) {
+        if ((polygon[i].latitude < y && polygon[j].latitude >= y ||
+                polygon[j].latitude < y && polygon[i].latitude >= y) &&
+            (polygon[i].longitude +
+                    (y - polygon[i].latitude) /
+                        (polygon[j].latitude - polygon[i].latitude) *
+                        (polygon[j].longitude - polygon[i].longitude) <
+                x)) {
+          oddNodes = !oddNodes;
+        }
+        j = i;
+      }
+      return oddNodes;
+    } catch (e) {
+      debugPrint("Error checking point in polygon: $e");
+      return true; // Fallback to bounding box check
+    }
+  }
+
   Map<String, dynamic>? _detectCity(LatLng point, String address) {
     for (var city in majorCities) {
       bool withinCoords = (point.latitude >= city["minLat"] && point.latitude <= city["maxLat"]) &&
                            (point.longitude >= city["minLng"] && point.longitude <= city["maxLng"]);
       bool containsName = address.toLowerCase().contains(city["name"].toString().toLowerCase());
       if (withinCoords || containsName) {
+        String polygonCoordsJson = city["polygonCoords"]?.toString() ?? "";
+        if (withinCoords && !_isPointInPolygon(point, polygonCoordsJson)) {
+          continue; // Point is outside the polygon boundary!
+        }
         return city;
       }
     }
@@ -358,7 +399,14 @@ class _LocalTaxiState extends State<LocalTaxi> {
     bool withinCoords = (point.latitude >= city["minLat"] && point.latitude <= city["maxLat"]) &&
                          (point.longitude >= city["minLng"] && point.longitude <= city["maxLng"]);
     bool containsName = address.toLowerCase().contains(city["name"].toString().toLowerCase());
-    return withinCoords || containsName;
+    if (withinCoords || containsName) {
+      String polygonCoordsJson = city["polygonCoords"]?.toString() ?? "";
+      if (withinCoords && !_isPointInPolygon(point, polygonCoordsJson)) {
+        return false; // Point is outside the polygon boundary!
+      }
+      return true;
+    }
+    return false;
   }
 
   void _showOutsideServiceAreaDialog() {
