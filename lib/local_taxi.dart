@@ -57,6 +57,7 @@ class _LocalTaxiState extends State<LocalTaxi> {
   void initState() {
     super.initState();
     fetchApiKey();
+    _fetchCityBoundaries();
     _getCurrentLocation();
 
     fromController.addListener(_onFromChanged);
@@ -314,7 +315,7 @@ class _LocalTaxiState extends State<LocalTaxi> {
 ]
 ''';
 
-  static const List<Map<String, dynamic>> majorCities = [
+  List<Map<String, dynamic>> majorCities = [
     {"name": "Pune", "minLat": 18.4100, "maxLat": 18.6500, "minLng": 73.7200, "maxLng": 73.9800},
     {"name": "Mumbai", "minLat": 18.8900, "maxLat": 19.3000, "minLng": 72.7500, "maxLng": 73.2000},
     {"name": "Nashik", "minLat": 19.9000, "maxLat": 20.1000, "minLng": 73.7000, "maxLng": 73.8800},
@@ -323,6 +324,23 @@ class _LocalTaxiState extends State<LocalTaxi> {
     {"name": "Kolhapur", "minLat": 16.6500, "maxLat": 16.7500, "minLng": 74.2000, "maxLng": 74.2800},
     {"name": "Solapur", "minLat": 17.6200, "maxLat": 17.7200, "minLng": 75.8500, "maxLng": 75.9500},
   ];
+
+  Future<void> _fetchCityBoundaries() async {
+    try {
+      final response = await http.get(Uri.parse(
+          'https://agnicarrental.com/admin2025/api_city_boundary.php?action=get_active_boundaries'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['cities'] != null) {
+          setState(() {
+            majorCities = List<Map<String, dynamic>>.from(data['cities']);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching city boundaries: $e');
+    }
+  }
 
   Map<String, dynamic>? _detectCity(LatLng point, String address) {
     for (var city in majorCities) {
