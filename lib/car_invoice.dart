@@ -523,7 +523,7 @@ class _InvoicePageState extends State<InvoicePage> {
                   ],
                   if (invoiceData['trip_type'] == 'Round-Trip') ...[
                     _buildPdfTableRow(
-                        'Total Km charge', '$maxKm x ${effectiveKmRate.toStringAsFixed(1)}', '${baceAmount.toStringAsFixed(2)}'),
+                        'Total Km charge', '$maxKm x ${effectiveKmRate.toStringAsFixed(1)}', '${baceAmount?.toStringAsFixed(2) ?? "0.00"}'),
                     _buildPdfTableRow('Total Days', '$totalDays', ''),
                   ],
 
@@ -992,7 +992,7 @@ class _InvoicePageState extends State<InvoicePage> {
         ],
         if (invoiceData['trip_type'] == 'Round-Trip') ...[
           _buildTableRow(
-              'Total Km charge', '$maxKm x ${effectiveKmRate.toStringAsFixed(1)}', '${baceAmount.toStringAsFixed(2)}'),
+              'Total Km charge', '$maxKm x ${effectiveKmRate.toStringAsFixed(1)}', '${baceAmount?.toStringAsFixed(2) ?? "0.00"}'),
           _buildTableRow('Total Days', '$totalDays', ''),
         ],
 
