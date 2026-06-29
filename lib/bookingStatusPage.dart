@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:math';
+import 'package:intl/intl.dart';
 import 'bottom_nav_bar.dart';
 import 'car_invoice.dart';
 import 'dart:async';
@@ -466,6 +468,58 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                   if ((booking['trip_type'] ?? '') == 'Round-Trip') {
                     double advancePaid = double.tryParse(booking['paid_amount']?.toString() ?? '') ??
                                          double.tryParse(booking['total_amount']?.toString() ?? '') ?? 0.0;
+
+                    // Calculate days from booked dates
+                    int days = 1;
+                    try {
+                      final bStartStr = booking['date']?.toString() ?? '';
+                      final bReturnStr = booking['return_date']?.toString() ?? '';
+                      if (bStartStr.isNotEmpty && bReturnStr.isNotEmpty && bStartStr != '0000-00-00' && bReturnStr != '0000-00-00') {
+                        try {
+                          final bStart = DateFormat('dd MMM yyyy').parse(bStartStr);
+                          final bReturn = DateFormat('dd MMM yyyy').parse(bReturnStr);
+                          days = bReturn.difference(bStart).inDays + 1;
+                        } catch (_) {
+                          final bStart = DateTime.parse(bStartStr);
+                          final bReturn = DateTime.parse(bReturnStr);
+                          days = bReturn.difference(bStart).inDays + 1;
+                        }
+                      }
+                    } catch (_) {}
+                    if (days <= 0) days = 1;
+
+                    // Calculate remaining balance dynamically (same logic as invoice)
+                    double dailyLimit = double.tryParse(booking['daily_limit']?.toString() ?? '0') ?? 0.0;
+                    double startingKm = double.tryParse(booking['starting_km']?.toString() ?? '0') ?? 0.0;
+                    double closingKm = double.tryParse(booking['closing_km']?.toString() ?? '0') ?? 0.0;
+                    double runningKm = (closingKm - startingKm).clamp(0, double.infinity);
+                    double maxKm = max(runningKm, dailyLimit * days);
+
+                    double kmRate = double.tryParse(booking['kmRate']?.toString() ?? '0') ?? 0.0;
+                    double agentCommission = double.tryParse(booking['agent_commission']?.toString() ?? '0') ?? 0.0;
+                    double commissionRate = 0.0;
+                    if (agentCommission > 0 && days > 0 && dailyLimit > 0) {
+                      commissionRate = (agentCommission / (dailyLimit * days)).roundToDouble();
+                    }
+                    double effectiveKmRate = kmRate + commissionRate;
+                    double baseAmount = maxKm * effectiveKmRate;
+
+                    double gstPercent = double.tryParse(booking['gstPercent']?.toString() ?? '0') ?? 0.0;
+                    double gst = baseAmount * gstPercent / 100;
+                    double parking = double.tryParse(booking['parking_charge']?.toString() ?? '0') ?? 0.0;
+                    double toll = double.tryParse(booking['toll_charge']?.toString() ?? '0') ?? 0.0;
+                    double permit = double.tryParse(booking['permit_charge']?.toString() ?? '0') ?? 0.0;
+                    double driverAllowancePerDay = double.tryParse(booking['driver_allowance']?.toString() ?? '0') ?? 0.0;
+                    double totalDriverAllowance = driverAllowancePerDay * days;
+
+                    double netTotal = baseAmount + gst + parking + toll + permit + totalDriverAllowance;
+                    double remaining = netTotal - advancePaid;
+
+                    bool isCompleted = (booking['booking_status'] ?? '') == 'Completed';
+                    String balanceText = isCompleted
+                        ? "₹${remaining.toStringAsFixed(2)}"
+                        : "₹${remaining.toStringAsFixed(2)} (Est.)";
+
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       child: Container(
@@ -498,17 +552,17 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text("Remaining Balance",
+                                Text(isCompleted ? "Balance Due" : "Est. Balance",
                                     style: GoogleFonts.poppins(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w600,
                                         color: Colors.grey[600])),
                                 const SizedBox(height: 2),
-                                Text("Pay to Driver at Trip End",
+                                Text(balanceText,
                                     style: GoogleFonts.poppins(
-                                        fontSize: 12,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.grey[800])),
+                                        color: remaining > 0 ? Colors.red[700] : Colors.green[700])),
                               ],
                             ),
                           ],
