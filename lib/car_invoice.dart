@@ -215,6 +215,9 @@ class _InvoicePageState extends State<InvoicePage> {
         double.tryParse(invoiceData['parking_charge'].toString()) ?? 0.0;
     double? toll_charge =
         double.tryParse(invoiceData['toll_charge'].toString()) ?? 0.0;
+    double agniShare = 0.0;
+    double agentRate = 0.0;
+    double finalRate = 0.0;
     if (invoiceData['trip_type'] == 'Local-Duty') {
       // Parse inputs safely
       final packageKm = double.tryParse(invoiceData['packageKm'] ?? '0') ?? 0;
@@ -313,8 +316,8 @@ class _InvoicePageState extends State<InvoicePage> {
       driver_allowance = driver_allowanceXdays.toString();
       totalDays = days;
 
-      double agniShare = double.tryParse(invoiceData['agni_share']?.toString() ?? '') ?? 0.0;
-      double agentRate = 0.0;
+      agniShare = double.tryParse(invoiceData['agni_share']?.toString() ?? '') ?? 0.0;
+      agentRate = 0.0;
       int divisorDays = days <= 0 ? 1 : days;
       if (agent_commission > 0) {
         if (invoiceData['booking_status'] == 'Completed' && runningKm > 0) {
@@ -323,7 +326,7 @@ class _InvoicePageState extends State<InvoicePage> {
           agentRate = (agent_commission / (300 * divisorDays)).roundToDouble();
         }
       }
-      double finalRate = kmRate + agniShare + agentRate;
+      finalRate = kmRate + agniShare + agentRate;
       baceAmount = (maxKm ?? 0) * finalRate;
 
       gst = baceAmount! * gstPercent / 100;
@@ -809,6 +812,9 @@ class _InvoicePageState extends State<InvoicePage> {
         double.tryParse(invoiceData['parking_charge'].toString()) ?? 0.0;
     double? toll_charge =
         double.tryParse(invoiceData['toll_charge'].toString()) ?? 0.0;
+    double agniShare = 0.0;
+    double agentRate = 0.0;
+    double finalRate = 0.0;
     if (invoiceData['trip_type'] == 'Local-Duty') {
       // Parse inputs safely
       final packageKm = double.tryParse(invoiceData['packageKm'] ?? '0') ?? 0;
@@ -919,8 +925,8 @@ class _InvoicePageState extends State<InvoicePage> {
       driver_allowance = driver_allowanceXdays.toString();
       totalDays = days;
 
-      double agniShare = double.tryParse(invoiceData['agni_share']?.toString() ?? '') ?? 0.0;
-      double agentRate = 0.0;
+      agniShare = double.tryParse(invoiceData['agni_share']?.toString() ?? '') ?? 0.0;
+      agentRate = 0.0;
       int divisorDays = days <= 0 ? 1 : days;
       if (agent_commission > 0) {
         if (invoiceData['booking_status'] == 'Completed' && runningKm > 0) {
@@ -929,7 +935,7 @@ class _InvoicePageState extends State<InvoicePage> {
           agentRate = (agent_commission / (300 * divisorDays)).roundToDouble();
         }
       }
-      double finalRate = kmRate + agniShare + agentRate;
+      finalRate = kmRate + agniShare + agentRate;
       baceAmount = (maxKm ?? 0) * finalRate;
 
       gst = baceAmount! * gstPercent / 100;
