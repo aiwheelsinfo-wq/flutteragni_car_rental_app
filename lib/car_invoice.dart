@@ -305,7 +305,7 @@ class _InvoicePageState extends State<InvoicePage> {
           days += 1;
         }
       }
-      maxKm = max(runningKm, (daily_limit * days));
+      maxKm = runningKm;
       driver_allowanceXdays = double.parse(driver_allowance) * days;
       driver_allowance = driver_allowanceXdays.toString();
       totalDays = days;
@@ -894,7 +894,7 @@ class _InvoicePageState extends State<InvoicePage> {
 
         //driver_allowanceXdays = double.parse(driver_allowance) * days;
       }
-      maxKm = max(runningKm, (daily_limit * days));
+      maxKm = runningKm;
       driver_allowanceXdays = double.parse(driver_allowance) * days;
       driver_allowance = driver_allowanceXdays.toString();
       totalDays = days;
