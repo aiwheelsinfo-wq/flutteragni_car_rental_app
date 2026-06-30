@@ -69,10 +69,10 @@ class _LoginPageState extends State<LoginPage> {
       var refData = jsonDecode(refRes.body);
       setState(() => referralRequired = (refData['status'] != 'success'));
 
-      // 2. Generate and Send OTP
+      // 2. Generate and Send OTP (via our server send_otp.php proxy to support both SMS and WhatsApp)
       String otp = generateOTP(6);
       String smsUrl =
-          "https://www.fast2sms.com/dev/bulkV2?authorization=$apiKey&route=dlt&sender_id=agni&message=170275&variables_values=$otp&flash=0&numbers=$phone";
+          "${ApiConfig.baseUrl}/send_otp.php?authorization=$apiKey&route=dlt&sender_id=agni&message=170275&variables_values=$otp&flash=0&numbers=$phone";
 
       var smsResponse = await http.get(Uri.parse(smsUrl));
       var smsData = jsonDecode(smsResponse.body);
