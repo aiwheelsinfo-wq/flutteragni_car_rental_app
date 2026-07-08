@@ -593,6 +593,10 @@ class _InvoicePageState extends State<InvoicePage> {
   }
 
   Future<void> _savePDF(BuildContext context) async {
+    if (Platform.isIOS) {
+      await _sharePDF(context);
+      return;
+    }
     try {
       final pdf = await _generateDocument();
       
