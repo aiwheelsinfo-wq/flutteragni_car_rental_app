@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:agni_car_rental/config/api_config.dart';
 import 'package:agni_car_rental/agent_page.dart';
+import 'package:agni_car_rental/AgentEarningsPage.dart';
 
 class UserProfilePage extends StatefulWidget {
   @override
@@ -19,10 +20,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
   final FlutterSecureStorage secureStorage = const FlutterSecureStorage();
   String? savedNumber;
 
+  String? userType;
+
   @override
   void initState() {
     super.initState();
     fetchUserData();
+    _loadUserType();
+  }
+
+  Future<void> _loadUserType() async {
+    String? type = await secureStorage.read(key: 'userType');
+    setState(() {
+      userType = type;
+    });
   }
 
   // --- Theme Logic Remains Same ---
@@ -181,6 +192,70 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   cleanDisplayVal(user!['email']), theme),
               _buildInfoTile(Icons.map_outlined, "Location",
                   _buildLocationString(user!['city'], user!['pincode']), theme),
+              if (userType == 'agent') ...[
+                const SizedBox(height: 30),
+                _buildSectionTitle("Agent Account", theme),
+                const SizedBox(height: 15),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AgentEarningsPage()),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: (theme['primary'] as Color).withOpacity(0.2), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        )
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: theme['iconBg'],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.account_balance_wallet_rounded, color: theme['primary'], size: 20),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "My Earnings & Commissions",
+                                style: GoogleFonts.poppins(
+                                  color: theme['text'],
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Text(
+                                "View your earned commissions",
+                                style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded, color: theme['primary']),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 30),
               _buildSectionTitle("Tier Benefits", theme),
               const SizedBox(height: 15),

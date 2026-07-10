@@ -12,12 +12,15 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 // --- Internal Imports ---
 import 'package:agni_car_rental/config/api_config.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'OneWayRegistration.dart';
 import 'localDutyReg.dart';
 import 'local_taxi.dart';
 import 'roundTripRegistration.dart';
 import 'spinner.dart';
 import 'pointcount.dart';
+import 'services/boundary_service.dart';
 
 /// =========================
 /// NOTIFICATION SERVICE
@@ -271,6 +274,8 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
   late LifecycleService lifecycle;
 
   DateTime? lastNotificationFetch;
+  bool _isInsideBoundary = false;
+  bool _isCheckingLocation = true;
 
   final List<String> imageUrls = [
     'https://agnicarrental.com/driver2025/add/add1.webp',
@@ -286,6 +291,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     fetchUserPoints();
     fetchSpinnerContent();
     checkForUpdate();
+    _checkCurrentLocationBoundary();
 
     lifecycle = LifecycleService(onResume: checkNotification);
     lifecycle.init();
@@ -293,6 +299,44 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       checkNotification();
     });
+  }
+
+  Future<void> _checkCurrentLocationBoundary() async {
+    setState(() => _isCheckingLocation = true);
+    try {
+      final boundaryService = BoundaryService();
+      await boundaryService.fetchCityBoundaries();
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+        Position position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.low);
+        
+        final detected = boundaryService.detectCity(
+          LatLng(position.latitude, position.longitude),
+          "",
+        );
+        setState(() {
+          _isInsideBoundary = (detected != null);
+          _isCheckingLocation = false;
+        });
+      } else {
+        setState(() {
+          _isInsideBoundary = false;
+          _isCheckingLocation = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error checking location boundary: $e");
+      setState(() {
+        _isInsideBoundary = false;
+        _isCheckingLocation = false;
+      });
+    }
   }
 
   @override
@@ -544,21 +588,34 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                     Icons.timer_rounded,
                     'Local Duty',
                     '8hr / 80km',
-                    Colors.orange.shade50,
-                    Colors.orange,
-                    () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                LocalDutyBookingForm(fromLocation: '')))),
+                    _isInsideBoundary ? Colors.orange.shade50 : Colors.grey.shade100,
+                    _isInsideBoundary ? Colors.orange : Colors.grey,
+                    () {
+                      if (_isInsideBoundary) {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    LocalDutyBookingForm(fromLocation: '')));
+                      } else {
+                        _showServiceDisabledDialog(context, "Local Duty");
+                      }
+                    }),
                 _buildServiceTile(
                     Icons.local_taxi_rounded,
                     'Local Cab',
                     'Quick Ride',
-                    Colors.purple.shade50,
-                    Colors.purple,
-                    () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => LocalTaxi()))),
+                    _isInsideBoundary ? Colors.purple.shade50 : Colors.grey.shade100,
+                    _isInsideBoundary ? Colors.purple : Colors.grey,
+                    () {
+                      if (_isInsideBoundary) {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => LocalTaxi()));
+                      } else {
+                        _showServiceDisabledDialog(context, "Local Cab");
+                      }
+                    }),
               ],
             ),
           ),
@@ -694,6 +751,33 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showServiceDisabledDialog(BuildContext context, String serviceName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            "Service Not Available",
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.red),
+          ),
+          content: Text(
+            "You are outside the boundary. Local Cab/Duty is not available in this location. Please choose One-Way or Round-Trip instead.",
+            style: GoogleFonts.poppins(),
+          ),
+          actions: [
+            TextButton(
+              child: Text(
+                "OK",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: primaryAmber),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
     );
   }
 }

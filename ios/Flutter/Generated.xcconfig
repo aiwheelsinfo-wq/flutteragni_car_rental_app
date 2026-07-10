@@ -1,7 +1,6 @@
 // This is a generated file; do not edit or check into version control.
-FLUTTER_ROOT=C:\flutter_windows_3.44.2-stable\flutter
-FLUTTER_APPLICATION_PATH=D:\restox vendor app\agni_car_rental
-FLUTTER_FRAMEWORK_SWIFT_PACKAGE_PATH=D:\restox vendor app\agni_car_rental\ios\Flutter\ephemeral\Packages\.packages\FlutterFramework
+FLUTTER_ROOT=D:\flutter\flutter
+FLUTTER_APPLICATION_PATH=D:\rentox\flutteragni_car_rental_app
 COCOAPODS_PARALLEL_CODE_SIGN=true
 FLUTTER_TARGET=lib\main.dart
 FLUTTER_BUILD_DIR=build

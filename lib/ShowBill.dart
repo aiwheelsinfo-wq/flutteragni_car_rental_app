@@ -131,15 +131,16 @@ class _ShowBillPageState extends State<ShowBillPage> {
   Future<void> _submitBooking() async {
     setState(() => _isWaiting = true);
     
-    double tripFare = widget.totalAmount;
-    double advanceAmount = tripFare * 0.25;
-    double gstAmount = tripFare * 0.05;
+    double commissionWithTax = widget.commission * 1.05;
+    double baseTripFare = widget.totalAmount - commissionWithTax;
+    double advanceAmount = baseTripFare * 0.25;
+    double gstAmount = baseTripFare * 0.05;
     double payableNow = advanceAmount + gstAmount;
 
-    // Vendor Earnings = 90% of Total Trip Amount
-    double vendorEarnings = tripFare * 0.90;
-    // Platform Commission = 10% of Total Trip Amount
-    double platformCommission = tripFare * 0.10;
+    // Vendor Earnings = 90% of Base Trip Fare
+    double vendorEarnings = baseTripFare * 0.90;
+    // Platform Commission = 10% of Base Trip Fare
+    double platformCommission = baseTripFare * 0.10;
 
     var url = Uri.parse("${ApiConfig.baseUrl}/saveBooking.php");
     try {
@@ -201,9 +202,10 @@ class _ShowBillPageState extends State<ShowBillPage> {
   void _showBookingConfirmationDialog() {
     if (!_formKey.currentState!.validate()) return;
 
-    double tripFare = widget.totalAmount;
-    double advanceAmount = tripFare * 0.25;
-    double gstAmount = tripFare * 0.05;
+    double commissionWithTax = widget.commission * 1.05;
+    double baseTripFare = widget.totalAmount - commissionWithTax;
+    double advanceAmount = baseTripFare * 0.25;
+    double gstAmount = baseTripFare * 0.05;
     double payableNow = advanceAmount + gstAmount;
 
     showModalBottomSheet(
@@ -349,6 +351,13 @@ class _ShowBillPageState extends State<ShowBillPage> {
   }
 
   Widget _buildTripSummaryCard() {
+    double commissionWithTax = widget.commission * 1.05;
+    double baseTripFare = widget.totalAmount - commissionWithTax;
+    double advanceAmount = baseTripFare * 0.25;
+    double gstAmount = baseTripFare * 0.05;
+    double payableNow = advanceAmount + gstAmount;
+    double remainingBalance = widget.totalAmount - payableNow;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -399,9 +408,11 @@ class _ShowBillPageState extends State<ShowBillPage> {
                 ),
                 const SizedBox(height: 20),
                 _buildFareRow("Base Fare",
-                    widget.totalAmount - widget.tollCharge - widget.driverTa),
+                    baseTripFare - widget.tollCharge - widget.driverTa),
                 _buildFareRow("Driver Allowance", widget.driverTa),
                 _buildFareRow("Toll Charges (Included)", widget.tollCharge),
+                if (widget.commission > 0)
+                  _buildFareRow("Agent Commission", commissionWithTax),
                 const Divider(height: 30),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -436,8 +447,8 @@ class _ShowBillPageState extends State<ShowBillPage> {
                             color: Colors.amber[900]),
                       ),
                       const SizedBox(height: 12),
-                      _buildFareRow("Advance (25%)", widget.totalAmount * 0.25),
-                      _buildFareRow("GST (5%)", widget.totalAmount * 0.05),
+                      _buildFareRow("Advance (25%)", advanceAmount),
+                      _buildFareRow("GST (5%)", gstAmount),
                       const Divider(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -450,7 +461,7 @@ class _ShowBillPageState extends State<ShowBillPage> {
                                     color: Colors.green[800])),
                           ),
                           const SizedBox(width: 8),
-                          Text("₹${(widget.totalAmount * 0.30).toStringAsFixed(2)}",
+                          Text("₹${payableNow.toStringAsFixed(2)}",
                               style: GoogleFonts.poppins(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w900,
@@ -462,14 +473,14 @@ class _ShowBillPageState extends State<ShowBillPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: Text("Remaining Balance (75%)",
+                            child: Text("Remaining Balance",
                                 style: GoogleFonts.poppins(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.grey[600])),
                           ),
                           const SizedBox(width: 8),
-                          Text("₹${(widget.totalAmount * 0.75).toStringAsFixed(2)}",
+                          Text("₹${remainingBalance.toStringAsFixed(2)}",
                               style: GoogleFonts.poppins(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
@@ -652,9 +663,10 @@ class _ShowBillPageState extends State<ShowBillPage> {
   }
 
   Widget _buildConfirmButton() {
-    double tripFare = widget.totalAmount;
-    double advanceAmount = tripFare * 0.25;
-    double gstAmount = tripFare * 0.05;
+    double commissionWithTax = widget.commission * 1.05;
+    double baseTripFare = widget.totalAmount - commissionWithTax;
+    double advanceAmount = baseTripFare * 0.25;
+    double gstAmount = baseTripFare * 0.05;
     double payableNow = advanceAmount + gstAmount;
 
     return SizedBox(

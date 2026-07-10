@@ -100,7 +100,10 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
 
   Future<void> startPage() async {
     savedNumber = await secureStorage.read(key: 'phone_number');
-    userType = await secureStorage.read(key: "userType");
+    String? type = await secureStorage.read(key: "userType");
+    setState(() {
+      userType = type;
+    });
     if (savedNumber != null) _loadUserData(savedNumber!);
   }
 
@@ -194,7 +197,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
             MaterialPageRoute(
                 builder: (_) => RazorpayPaymentPage(
                       bookingId: createdBookingId,
-                      amount: totalAdvance,
+                      amount: baseAdvance,
                       isFullPay: false,
                     )));
       } else {
@@ -522,8 +525,6 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
     double dailyLimit = widget.kmPerDay;
     int days = _calculateDays();
     double baseAdvance = dailyLimit * 2 * days;
-    double calculatedCommission = _calculateAgentCommission();
-    double totalAdvancePayable = baseAdvance + calculatedCommission;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -559,7 +560,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
                   width: 20,
                   child: CircularProgressIndicator(
                       color: primaryAmber, strokeWidth: 2))
-              : Text("CONFIRM & PAY ADVANCE: ₹${totalAdvancePayable.toStringAsFixed(0)}",
+              : Text("CONFIRM & PAY ADVANCE: ₹${baseAdvance.toStringAsFixed(0)}",
                   style: GoogleFonts.poppins(
                       color: primaryAmber,
                       fontWeight: FontWeight.bold,
@@ -574,7 +575,6 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
     int days = _calculateDays();
     double baseAdvance = dailyLimit * 2 * days;
     double calculatedCommission = _calculateAgentCommission();
-    double totalAdvancePayable = baseAdvance + calculatedCommission;
 
     return Container(
       margin: const EdgeInsets.only(top: 20),
@@ -636,7 +636,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
               ),
               const SizedBox(width: 8),
               Text(
-                "₹${totalAdvancePayable.toStringAsFixed(0)}",
+                "₹${baseAdvance.toStringAsFixed(0)}",
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,

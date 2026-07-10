@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'TripSelectionPage.dart';
 import 'bookingStatusPage.dart';
 import 'profile_page.dart';
+import 'AgentEarningsPage.dart';
 
 class BottomNavBar extends StatefulWidget {
   @override
@@ -11,12 +13,47 @@ class BottomNavBar extends StatefulWidget {
 
 class _BottomNavBarState extends State<BottomNavBar> {
   int _selectedIndex = 0;
+  final FlutterSecureStorage secureStorage = const FlutterSecureStorage();
+  String? userType;
+  bool isLoading = true;
 
-  final List<Widget> _pages = [
-    TripSelectionPage(),
-    BookingStatusPage(),
-    UserProfilePage()
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadUserType();
+  }
+
+  Future<void> _loadUserType() async {
+    try {
+      String? type = await secureStorage.read(key: 'userType');
+      setState(() {
+        userType = type;
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint("Error reading userType: $e");
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  List<Widget> _getPages() {
+    if (userType == 'agent') {
+      return [
+        TripSelectionPage(),
+        BookingStatusPage(),
+        const AgentEarningsPage(),
+        UserProfilePage()
+      ];
+    } else {
+      return [
+        TripSelectionPage(),
+        BookingStatusPage(),
+        UserProfilePage()
+      ];
+    }
+  }
 
   // --- Soft Amber Palette ---
   final Color navBackground = const Color(0xFFFFF9E7); // Very soft cream-amber
@@ -31,11 +68,24 @@ class _BottomNavBarState extends State<BottomNavBar> {
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.amber),
+        ),
+      );
+    }
+
+    final pages = _getPages();
+    if (_selectedIndex >= pages.length) {
+      _selectedIndex = 0;
+    }
+
     return Scaffold(
       // IndexedStack preserves the state/scroll of your pages
       body: IndexedStack(
         index: _selectedIndex,
-        children: _pages,
+        children: pages,
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -84,9 +134,15 @@ class _BottomNavBarState extends State<BottomNavBar> {
                       Icons.receipt_long_rounded, 1),
                   label: 'My Trips',
                 ),
+                if (userType == 'agent')
+                  BottomNavigationBarItem(
+                    icon: _buildIcon(Icons.account_balance_wallet_outlined,
+                        Icons.account_balance_wallet_rounded, 2),
+                    label: 'Earnings',
+                  ),
                 BottomNavigationBarItem(
                   icon: _buildIcon(
-                      Icons.person_outline_rounded, Icons.person_rounded, 2),
+                      Icons.person_outline_rounded, Icons.person_rounded, userType == 'agent' ? 3 : 2),
                   label: 'Profile',
                 ),
               ],

@@ -11,6 +11,8 @@ import 'package:geolocator/geolocator.dart';
 
 // Assuming this exists in your project
 import 'package:agni_car_rental/rounTripDateAndTime.dart';
+import 'local_taxi.dart';
+import 'services/boundary_service.dart';
 
 class RoundTripFromToMapScreen extends StatefulWidget {
   const RoundTripFromToMapScreen({Key? key}) : super(key: key);
@@ -50,6 +52,7 @@ class _FromToMapScreenState extends State<RoundTripFromToMapScreen> {
   void initState() {
     super.initState();
     fetchApiKey();
+    BoundaryService().fetchCityBoundaries();
   }
 
   @override
@@ -337,6 +340,70 @@ class _FromToMapScreenState extends State<RoundTripFromToMapScreen> {
     );
   }
 
+  void _handleProceed() {
+    if (fromLatLng != null && toLatLng != null) {
+      final boundaryService = BoundaryService();
+      final Map<String, dynamic>? detectedCity = boundaryService.detectCity(fromLatLng!, fromController.text);
+      if (detectedCity != null) {
+        if (boundaryService.isPointInCity(toLatLng!, toController.text, detectedCity)) {
+          _showWithinCityBoundaryDialog(detectedCity["name"]);
+          return;
+        }
+      }
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RoundTripDateAndTime(
+          from: fromController.text,
+          to: toController.text,
+          distanceInKm: tripDistanceInKm ?? 0.0,
+        ),
+      ),
+    );
+  }
+
+  void _showWithinCityBoundaryDialog(String cityName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            "Route Within City Limits",
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.red),
+          ),
+          content: Text(
+            "This route is within $cityName city limits. Please choose Local Taxi for travel within the same city.",
+            style: GoogleFonts.poppins(),
+          ),
+          actions: [
+            TextButton(
+              child: Text(
+                "Go to Local Taxi",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: const Color(0xFFFFB300)),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LocalTaxi()),
+                );
+              },
+            ),
+            TextButton(
+              child: Text(
+                "Cancel",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.grey),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildHeaderSwitcher() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
@@ -527,14 +594,7 @@ class _FromToMapScreenState extends State<RoundTripFromToMapScreen> {
             ),
             const SizedBox(height: 25),
             ElevatedButton(
-              onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => RoundTripDateAndTime(
-                            from: fromController.text,
-                            to: toController.text,
-                            distanceInKm: tripDistanceInKm ?? 0.0,
-                          ))),
+              onPressed: _handleProceed,
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryAmber,
                 foregroundColor: charcoalDark,

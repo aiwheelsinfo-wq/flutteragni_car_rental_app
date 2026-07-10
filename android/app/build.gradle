@@ -8,7 +8,8 @@
     android {
         namespace "com.agni.agni_car_rental"
         compileSdk 36
-
+        ndkVersion "28.2.13676358"
+        
         defaultConfig {
             applicationId "com.agni.agni_car_rental"
             minSdkVersion flutter.minSdkVersion
@@ -32,7 +33,10 @@
         if (keystorePropertiesFile.exists()) {
             keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
         } else {
-            throw new FileNotFoundException("Missing key.properties file")
+            keystoreProperties['keyAlias'] = 'dummy'
+            keystoreProperties['keyPassword'] = 'dummy'
+            keystoreProperties['storeFile'] = 'dummy'
+            keystoreProperties['storePassword'] = 'dummy'
         }
 
         signingConfigs {

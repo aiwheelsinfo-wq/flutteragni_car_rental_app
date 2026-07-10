@@ -14,6 +14,7 @@ import 'package:agni_car_rental/config/api_config.dart';
 import 'localDutyReg.dart';
 import 'local_taxi.dart';
 import 'oneWayDateAndTime.dart';
+import 'services/boundary_service.dart';
 
 class FromToMapScreen extends StatefulWidget {
   @override
@@ -47,6 +48,7 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
   void initState() {
     super.initState();
     fetchApiKey();
+    BoundaryService().fetchCityBoundaries();
   }
 
   @override
@@ -240,7 +242,7 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
       String durationText = "${(durationSec / 60).round()} mins";
 
       // ✅ Base trip type logic
-      String type = distanceKm > 75 ? "One-way" : "Local";
+      String type = "One-way";
 
       // ✅ SPECIAL LOCATION CHECK (SAFE + OPTIONAL)
       try {
@@ -347,6 +349,69 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
             _buildBottomRidePanel(),
         ],
       ),
+    );
+  }
+
+  void _handleProceed() {
+    if (fromLatLng != null && toLatLng != null) {
+      final boundaryService = BoundaryService();
+      final Map<String, dynamic>? detectedCity = boundaryService.detectCity(fromLatLng!, fromController.text);
+      if (detectedCity != null) {
+        if (boundaryService.isPointInCity(toLatLng!, toController.text, detectedCity)) {
+          _showWithinCityBoundaryDialog(detectedCity["name"]);
+          return;
+        }
+      }
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OneWayDateAndTime(
+          from: fromController.text,
+          to: toController.text,
+        ),
+      ),
+    );
+  }
+
+  void _showWithinCityBoundaryDialog(String cityName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            "Route Within City Limits",
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.red),
+          ),
+          content: Text(
+            "This route is within $cityName city limits. Please choose Local Taxi for travel within the same city.",
+            style: GoogleFonts.poppins(),
+          ),
+          actions: [
+            TextButton(
+              child: Text(
+                "Go to Local Taxi",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: const Color(0xFFFFB300)),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LocalTaxi()),
+                );
+              },
+            ),
+            TextButton(
+              child: Text(
+                "Cancel",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.grey),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -550,11 +615,7 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
               )
             else
               ElevatedButton(
-                onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => OneWayDateAndTime(
-                            from: fromController.text, to: toController.text))),
+                onPressed: _handleProceed,
                 style: ElevatedButton.styleFrom(
                     backgroundColor: amberPrimary,
                     foregroundColor: charcoalDark,
