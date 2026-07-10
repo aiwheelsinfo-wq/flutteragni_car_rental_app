@@ -164,7 +164,7 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
           driverTa = (numericDistance < 200) ? 300 : 400;
           tollCharge = numericDistance * 2.25;
           baseCharge = driverTa + tollCharge;
-          belowFifty = numericDistance < 50;
+          belowFifty = false;
         });
       }
     } catch (e) {
