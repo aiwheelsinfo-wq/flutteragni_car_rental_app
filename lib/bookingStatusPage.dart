@@ -615,7 +615,7 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                     bool isLocalDuty = (booking['trip_type'] ?? '').toString().toLowerCase().contains('local-duty') || 
                                        (booking['trip_type'] ?? '').toString().toLowerCase().contains('local duty');
                     double advancePaid = isLocalDuty
-                        ? (double.tryParse(booking['paid_amount']?.toString() ?? '') ?? 200.0)
+                        ? (double.tryParse(booking['paid_amount']?.toString() ?? '') ?? 250.0)
                         : (totalFare * 0.30);
                     double remaining = isLocalDuty
                         ? (totalFare - advancePaid)

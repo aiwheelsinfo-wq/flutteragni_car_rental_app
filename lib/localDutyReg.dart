@@ -329,7 +329,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
               MaterialPageRoute(
                   builder: (context) => RazorpayPaymentPage(
                         bookingId: createdBookingId,
-                        amount: 200.0,
+                        amount: 250.0,
                         isFullPay: false,
                       )));
         } else {
@@ -814,7 +814,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text("PAY ADVANCE ₹200",
+                  const Text("PAY ADVANCE ₹250",
                       style: TextStyle(
                           fontWeight: FontWeight.w900, letterSpacing: 1.2)),
                   const SizedBox(width: 10),
