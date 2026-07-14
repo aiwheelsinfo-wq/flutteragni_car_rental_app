@@ -925,13 +925,13 @@ class _InvoicePageState extends State<InvoicePage> {
     double base_charge = 0.0;
     if (invoiceData['trip_type'] == 'One-way') {
       double distance = double.parse(invoiceData['distance'].toString());
-      double driver_allowanceVal;
+      double driver_allowance;
 
-      driver_allowanceVal = (distance < 200) ? 300 : 400;
+      driver_allowance = (distance < 200) ? 300 : 400;
 
       baceAmount = invoiceData['total_amount'] != '0'
           ? double.parse(invoiceData['total_amount'].toString())
-          : (distance * kmRate) + driver_allowanceVal;
+          : (distance * kmRate) + driver_allowance;
 
       double totalbeforeGst = (distance * kmRate) + agent_commission;
 
@@ -948,7 +948,6 @@ class _InvoicePageState extends State<InvoicePage> {
       totalbeforeGst = double.parse(totalbeforeGst.toStringAsFixed(2));
       gst = double.parse(gst.toStringAsFixed(2));
       netTotal = double.parse(netTotal.toStringAsFixed(2));
-      driver_allowance = driver_allowanceVal.toString();
     }
 
     if (invoiceData['trip_type'] == 'Local-taxi') {
