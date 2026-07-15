@@ -613,28 +613,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
             ),
           ),
 
-          // 4. Promotions Carousel
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: CarouselSlider(
-                options: CarouselOptions(
-                    height: 160,
-                    autoPlay: true,
-                    enlargeCenterPage: true,
-                    viewportFraction: 0.85),
-                items: imageUrls
-                    .map((url) => ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: CachedNetworkImage(
-                              imageUrl: url,
-                              fit: BoxFit.cover,
-                              width: double.infinity),
-                        ))
-                    .toList(),
-              ),
-            ),
-          ),
+          // 4. Promotions Carousel (Removed as requested)
 
           const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],
