@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'agent_page.dart';
 import 'CarSelectionPage.dart';
 import 'bottom_nav_bar.dart';
@@ -43,8 +46,36 @@ class _MyAppState extends State<MyApp> {
 
     // ✅ Delay heavy work to avoid UI freeze
     Future.delayed(const Duration(milliseconds: 500), () {
-      checkStoredPhoneNumber();
+      checkAppVersionAndInit();
     });
+  }
+
+  Future<void> checkAppVersionAndInit() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final currentVersion = packageInfo.version;
+
+      final response = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/check_version.php?app_type=customer&version=$currentVersion")
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data["force_update"] == true) {
+          final playStoreUrl = data["play_store_url"] ?? "";
+          if (mounted) {
+            setState(() {
+              initialScreen = ForceUpdateScreen(playStoreUrl: playStoreUrl);
+            });
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Version Check Error: $e");
+    }
+
+    checkStoredPhoneNumber();
   }
 
   Future<void> checkStoredPhoneNumber() async {
@@ -141,6 +172,93 @@ class _MyAppState extends State<MyApp> {
       routes: {
         '/CarSelectionPage': (context) => CarSelectionPage(),
       },
+    );
+  }
+}
+
+class ForceUpdateScreen extends StatelessWidget {
+  final String playStoreUrl;
+
+  const ForceUpdateScreen({super.key, required this.playStoreUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 30),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.system_update_rounded,
+                  size: 80,
+                  color: Colors.amber[800],
+                ),
+              ),
+              const SizedBox(height: 40),
+              Text(
+                "Update Required",
+                style: GoogleFonts.poppins(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 15),
+              Text(
+                "A new version of the app is available on the Play Store with important updates. Please update to continue using the application.",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.5,
+                ),
+              ),
+              const Spacer(),
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.amber[850] ?? Colors.amber[800],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    elevation: 2,
+                  ),
+                  onPressed: () async {
+                    if (playStoreUrl.isNotEmpty) {
+                      final uri = Uri.parse(playStoreUrl);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    }
+                  },
+                  child: Text(
+                    "UPDATE NOW",
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
