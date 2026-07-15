@@ -665,6 +665,46 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
               fontStyle: FontStyle.italic,
             ),
           ),
+          const SizedBox(height: 15),
+          const Divider(height: 16),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.amber.shade200, width: 0.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 14, color: Colors.amber[900]),
+                    const SizedBox(width: 6),
+                    Text(
+                      "Driver Allowance Terms & Conditions",
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber[900],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "• Early Morning Allowance (1:00 AM - 6:00 AM): ₹300 extra to be paid to the driver.\n"
+                  "• Late Arrival Allowance (after 11:45 PM): ₹300 extra to be paid to the driver.",
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    color: Colors.grey[800],
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
