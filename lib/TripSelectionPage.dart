@@ -531,287 +531,89 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
           // 1. Greeting Section
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "Hello there!",
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "Where would you like to go?",
-                    style: GoogleFonts.poppins(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: textDark,
-                      height: 1.2,
-                    ),
-                  ),
+                  Text("Hello there!",
+                      style: GoogleFonts.poppins(
+                          fontSize: 16, color: Colors.grey[600])),
+                  Text("Where would you like to go?",
+                      style: GoogleFonts.poppins(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: textDark)),
                 ],
               ),
             ),
           ),
 
-          // 2. Premium Promotional Banner
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF263238), Color(0xFF37474F)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    )
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: primaryAmber.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: primaryAmber.withOpacity(0.4), width: 1),
-                            ),
-                            child: Text(
-                              "RENTAL PREMIER",
-                              style: TextStyle(
-                                color: primaryAmber,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            "Your Premium Ride Awaits",
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            "Book a safe, sanitized, and professional chauffeur-driven cab with Rentox.",
-                            style: GoogleFonts.poppins(
-                              color: Colors.white70,
-                              fontSize: 11,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.08),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.directions_car_filled_rounded,
-                        color: primaryAmber,
-                        size: 40,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          // 2. Premium Reward Card (Removed as requested)
 
           // 3. Grid of Services
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.all(20),
             sliver: SliverGrid.count(
               crossAxisCount: 2,
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
-              childAspectRatio: 0.95,
+              childAspectRatio: 1.1,
               children: [
                 _buildServiceTile(
-                  icon: Icons.near_me_rounded,
-                  title: 'One Way',
-                  sub: 'Outstation Pick',
-                  badgeText: 'Outstation',
-                  baseColor: Colors.blue,
-                  isEnabled: true,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => FromToMapScreen()),
-                  ),
-                ),
+                    Icons.near_me_rounded,
+                    'One Way',
+                    'Outstation',
+                    Colors.blue.shade50,
+                    Colors.blue,
+                    () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => FromToMapScreen()))),
                 _buildServiceTile(
-                  icon: Icons.sync_alt_rounded,
-                  title: 'Round Trip',
-                  sub: 'Outstation Return',
-                  badgeText: 'Multi-Day',
-                  baseColor: Colors.green,
-                  isEnabled: true,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => RoundTripFromToMapScreen()),
-                  ),
-                ),
-                _buildServiceTile(
-                  icon: Icons.timer_rounded,
-                  title: 'Local Duty',
-                  sub: '8hr / 80km package',
-                  badgeText: 'Hourly',
-                  baseColor: Colors.orange,
-                  isEnabled: _isInsideBoundary,
-                  onTap: () {
-                    if (_isInsideBoundary) {
-                      Navigator.push(
+                    Icons.sync_alt_rounded,
+                    'Round Trip',
+                    'Outstation',
+                    Colors.green.shade50,
+                    Colors.green,
+                    () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => LocalDutyBookingForm(fromLocation: ''),
-                        ),
-                      );
-                    } else {
-                      _showServiceDisabledDialog(context, "Local Duty");
-                    }
-                  },
-                ),
+                            builder: (_) => RoundTripFromToMapScreen()))),
                 _buildServiceTile(
-                  icon: Icons.local_taxi_rounded,
-                  title: 'Local Cab',
-                  sub: 'Point to point ride',
-                  badgeText: 'Quick Cab',
-                  baseColor: Colors.purple,
-                  isEnabled: _isInsideBoundary,
-                  onTap: () {
-                    if (_isInsideBoundary) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => LocalTaxi()),
-                      );
-                    } else {
-                      _showServiceDisabledDialog(context, "Local Cab");
-                    }
-                  },
-                ),
+                    Icons.timer_rounded,
+                    'Local Duty',
+                    '8hr / 80km',
+                    _isInsideBoundary ? Colors.orange.shade50 : Colors.grey.shade100,
+                    _isInsideBoundary ? Colors.orange : Colors.grey,
+                    () {
+                      if (_isInsideBoundary) {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    LocalDutyBookingForm(fromLocation: '')));
+                      } else {
+                        _showServiceDisabledDialog(context, "Local Duty");
+                      }
+                    }),
+                _buildServiceTile(
+                    Icons.local_taxi_rounded,
+                    'Local Cab',
+                    'Quick Ride',
+                    _isInsideBoundary ? Colors.purple.shade50 : Colors.grey.shade100,
+                    _isInsideBoundary ? Colors.purple : Colors.grey,
+                    () {
+                      if (_isInsideBoundary) {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => LocalTaxi()));
+                      } else {
+                        _showServiceDisabledDialog(context, "Local Cab");
+                      }
+                    }),
               ],
             ),
           ),
 
-          // 4. Location Status Banner
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-              child: Builder(
-                builder: (context) {
-                  if (_isCheckingLocation) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.blue.shade100),
-                      ),
-                      child: Row(
-                        children: [
-                          const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              "Verifying your location boundary...",
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                color: Colors.blue.shade800,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  
-                  if (_isInsideBoundary) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.green.shade100),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.verified_user_rounded, color: Colors.green[800], size: 18),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              "Location verified: Local Cab & Duty active",
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                color: Colors.green.shade800,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.amber.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline_rounded, color: Colors.amber[800], size: 18),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            "Outside Local Zone: Outstation trips only",
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: Colors.amber.shade900,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
+          // 4. Promotions Carousel (Removed as requested)
 
           const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],
@@ -886,97 +688,38 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     );
   }
 
-  Widget _buildServiceTile({
-    required IconData icon,
-    required String title,
-    required String sub,
-    required String badgeText,
-    required Color baseColor,
-    required bool isEnabled,
-    required VoidCallback onTap,
-  }) {
-    final Color tint = baseColor.withOpacity(0.08);
-    final Color iconCol = isEnabled ? baseColor : Colors.grey;
-    final Color titleCol = isEnabled ? textDark : Colors.grey[600]!;
-
+  Widget _buildServiceTile(IconData icon, String title, String sub, Color tint,
+      Color iconCol, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      child: Container(
         decoration: BoxDecoration(
-          color: isEnabled ? Colors.white : Colors.grey[100],
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isEnabled ? baseColor.withOpacity(0.15) : Colors.grey.withOpacity(0.2),
-            width: 1.5,
-          ),
-          boxShadow: isEnabled
-              ? [
-                  BoxShadow(
-                    color: baseColor.withOpacity(0.06),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : [],
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4))
+          ],
         ),
-        child: Stack(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isEnabled ? baseColor.withOpacity(0.12) : Colors.grey.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  badgeText.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w800,
-                    color: isEnabled ? baseColor : Colors.grey[700],
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: tint, shape: BoxShape.circle),
+              child: Icon(icon, color: iconCol, size: 30),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: tint,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon, color: iconCol, size: 28),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    title,
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      color: titleCol,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    sub,
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      color: isEnabled ? Colors.grey[500] : Colors.grey[400],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            const SizedBox(height: 12),
+            Text(title,
+                style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: textDark)),
+            Text(sub,
+                style:
+                    GoogleFonts.poppins(fontSize: 10, color: Colors.grey[500])),
           ],
         ),
       ),

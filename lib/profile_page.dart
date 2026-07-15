@@ -181,8 +181,32 @@ class _UserProfilePageState extends State<UserProfilePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 10),
-              _buildMembershipCard(badgeString, theme, size),
+              const SizedBox(height: 20),
+              Center(
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: (theme['primary'] as Color).withOpacity(0.12),
+                      child: Icon(
+                        Icons.person_rounded,
+                        size: 55,
+                        color: theme['primary'],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      user!['name']?.toUpperCase() ?? 'CUSTOMER',
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: theme['text'],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 30),
               _buildSectionTitle("Contact Details", theme),
               const SizedBox(height: 15),
@@ -256,10 +280,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   ),
                 ),
               ],
-              const SizedBox(height: 30),
-              _buildSectionTitle("Tier Benefits", theme),
-              const SizedBox(height: 15),
-              _buildBenefitsGrid(badgeString, theme, size),
               const SizedBox(height: 30),
             ],
           ),
