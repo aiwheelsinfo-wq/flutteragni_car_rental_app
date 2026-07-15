@@ -17,9 +17,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _otpController = TextEditingController();
-  final TextEditingController _referralController = TextEditingController();
 
-  bool referralRequired = false;
   bool isOtpSent = false;
   bool isLoading = false;
   String? generatedOtp;
@@ -61,13 +59,6 @@ class _LoginPageState extends State<LoginPage> {
         setState(() => isLoading = false);
         return;
       }
-
-      // Check referral requirement
-      var refUrl = Uri.parse(
-          "${ApiConfig.baseUrl}/check_phone_status.php?phone_number=$phone");
-      var refRes = await http.get(refUrl);
-      var refData = jsonDecode(refRes.body);
-      setState(() => referralRequired = (refData['status'] != 'success'));
 
       // 2. Generate and Send OTP (via our server send_otp.php proxy to support both SMS and WhatsApp)
       String otp = generateOTP(6);
@@ -223,22 +214,6 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
 
-                      // 🎁 Referral Input
-                      if (isOtpSent && referralRequired) ...[
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          controller: _referralController,
-                          label: "Referral Number (Optional)",
-                          icon: Icons.card_giftcard_rounded,
-                          type: TextInputType.phone,
-                          limit: 10,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(10),
-                          ],
-                        ),
-                      ],
-
                       const SizedBox(height: 30),
 
                       // 🚀 Action Button
@@ -327,22 +302,6 @@ class _LoginPageState extends State<LoginPage> {
     if (_otpController.text.trim() == generatedOtp) {
       HapticFeedback.lightImpact();
       final phoneNumber = _phoneController.text.trim();
-      final referralNumber = _referralController.text.trim();
-
-      if (referralRequired && referralNumber.isNotEmpty) {
-        try {
-          var url =
-              Uri.parse("${ApiConfig.baseUrl}/customer_referral.php");
-          await http.post(
-            url,
-            headers: {"Content-Type": "application/json"},
-            body: jsonEncode({
-              "customer_number": phoneNumber,
-              "referred_by": referralNumber
-            }),
-          );
-        } catch (_) {}
-      }
 
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
