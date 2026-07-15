@@ -263,8 +263,9 @@ class TripSelectionPage extends StatefulWidget {
 
 class _TripSelectionPageState extends State<TripSelectionPage> {
   final Color primaryAmber = const Color(0xFFFFB300);
-  final Color bgCream = const Color(0xFFFEFBF3);
-  final Color textDark = const Color(0xFF2D2D2D);
+  final Color bgCream = const Color(0xFFF8F9FA);
+  final Color textDark = const Color(0xFF1A1A2E);
+  final Color cardBg = const Color(0xFFFFFFFF);
 
   int userPoints = 0;
   SpinnerContent? spinnerContent;
@@ -517,106 +518,393 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
     return Scaffold(
       backgroundColor: bgCream,
-      appBar: AppBar(
-        backgroundColor: bgCream,
-        elevation: 0,
-        centerTitle: false,
-        title: Image.asset('assets/home.png', height: 28),
-      ),
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // 1. Greeting Section
+          // ─── Hero Header ───
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Hello there!",
-                      style: GoogleFonts.poppins(
-                          fontSize: 16, color: Colors.grey[600])),
-                  Text("Where would you like to go?",
-                      style: GoogleFonts.poppins(
-                          fontSize: 24,
+            child: Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(36),
+                  bottomRight: Radius.circular(36),
+                ),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 36),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Top bar: logo + location badge
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Image.asset('assets/home.png', height: 30),
+                          _buildLocationBadge(),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
+                      // Greeting
+                      Text(
+                        'Hello there! 👋',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: Colors.white60,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Where would you like\nto go today?',
+                        style: GoogleFonts.poppins(
+                          fontSize: 26,
                           fontWeight: FontWeight.bold,
-                          color: textDark)),
-                ],
+                          color: Colors.white,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // Amber accent line
+                      Container(
+                        width: 48,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: primaryAmber,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
 
-          // 2. Premium Reward Card (Removed as requested)
+          // ─── Section Title ───
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+              child: Text(
+                'Choose Your Ride',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: textDark,
+                ),
+              ),
+            ),
+          ),
 
-          // 3. Grid of Services
+          // ─── Service Cards Grid ───
           SliverPadding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             sliver: SliverGrid.count(
               crossAxisCount: 2,
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
-              childAspectRatio: 1.1,
+              childAspectRatio: 0.95,
               children: [
-                _buildServiceTile(
-                    Icons.near_me_rounded,
-                    'One Way',
-                    'Outstation',
-                    Colors.blue.shade50,
-                    Colors.blue,
-                    () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => FromToMapScreen()))),
-                _buildServiceTile(
-                    Icons.sync_alt_rounded,
-                    'Round Trip',
-                    'Outstation',
-                    Colors.green.shade50,
-                    Colors.green,
-                    () => Navigator.push(
+                _buildServiceCard(
+                  icon: Icons.near_me_rounded,
+                  title: 'One Way',
+                  subtitle: 'Outstation',
+                  gradientColors: [const Color(0xFF4776E6), const Color(0xFF8E54E9)],
+                  isAvailable: true,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => FromToMapScreen()),
+                  ),
+                ),
+                _buildServiceCard(
+                  icon: Icons.sync_alt_rounded,
+                  title: 'Round Trip',
+                  subtitle: 'Outstation',
+                  gradientColors: [const Color(0xFF11998E), const Color(0xFF38EF7D)],
+                  isAvailable: true,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => RoundTripFromToMapScreen()),
+                  ),
+                ),
+                _buildServiceCard(
+                  icon: Icons.timer_rounded,
+                  title: 'Local Duty',
+                  subtitle: '8hr / 80km',
+                  gradientColors: _isInsideBoundary
+                      ? [const Color(0xFFFF8008), const Color(0xFFFFC837)]
+                      : [const Color(0xFF9E9E9E), const Color(0xFFBDBDBD)],
+                  isAvailable: _isInsideBoundary,
+                  onTap: () {
+                    if (_isInsideBoundary) {
+                      Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => RoundTripFromToMapScreen()))),
-                _buildServiceTile(
-                    Icons.timer_rounded,
-                    'Local Duty',
-                    '8hr / 80km',
-                    _isInsideBoundary ? Colors.orange.shade50 : Colors.grey.shade100,
-                    _isInsideBoundary ? Colors.orange : Colors.grey,
-                    () {
-                      if (_isInsideBoundary) {
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    LocalDutyBookingForm(fromLocation: '')));
-                      } else {
-                        _showServiceDisabledDialog(context, "Local Duty");
-                      }
-                    }),
-                _buildServiceTile(
-                    Icons.local_taxi_rounded,
-                    'Local Cab',
-                    'Quick Ride',
-                    _isInsideBoundary ? Colors.purple.shade50 : Colors.grey.shade100,
-                    _isInsideBoundary ? Colors.purple : Colors.grey,
-                    () {
-                      if (_isInsideBoundary) {
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => LocalTaxi()));
-                      } else {
-                        _showServiceDisabledDialog(context, "Local Cab");
-                      }
-                    }),
+                          builder: (_) => LocalDutyBookingForm(fromLocation: ''),
+                        ),
+                      );
+                    } else {
+                      _showServiceDisabledDialog(context, 'Local Duty');
+                    }
+                  },
+                ),
+                _buildServiceCard(
+                  icon: Icons.local_taxi_rounded,
+                  title: 'Local Cab',
+                  subtitle: 'Quick Ride',
+                  gradientColors: _isInsideBoundary
+                      ? [const Color(0xFF7B2FF7), const Color(0xFFF107A3)]
+                      : [const Color(0xFF9E9E9E), const Color(0xFFBDBDBD)],
+                  isAvailable: _isInsideBoundary,
+                  onTap: () {
+                    if (_isInsideBoundary) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => LocalTaxi()),
+                      );
+                    } else {
+                      _showServiceDisabledDialog(context, 'Local Cab');
+                    }
+                  },
+                ),
               ],
             ),
           ),
 
-          // 4. Promotions Carousel (Removed as requested)
+          // ─── Info Banner ───
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: primaryAmber.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(Icons.info_outline_rounded,
+                          color: primaryAmber, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Local Services',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: textDark,
+                            ),
+                          ),
+                          Text(
+                            _isCheckingLocation
+                                ? 'Checking your location...'
+                                : _isInsideBoundary
+                                    ? 'Local Cab & Duty available in your area'
+                                    : 'Local services not available in your current area',
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 40)),
+          const SliverToBoxAdapter(child: SizedBox(height: 48)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLocationBadge() {
+    if (_isCheckingLocation) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 10,
+              height: 10,
+              child: CircularProgressIndicator(
+                  strokeWidth: 1.5, color: Colors.white70),
+            ),
+            const SizedBox(width: 6),
+            Text('Locating...',
+                style: GoogleFonts.poppins(
+                    fontSize: 11, color: Colors.white70)),
+          ],
+        ),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: _isInsideBoundary
+            ? Colors.green.withOpacity(0.2)
+            : Colors.red.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _isInsideBoundary
+              ? Colors.greenAccent.withOpacity(0.5)
+              : Colors.redAccent.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.location_on_rounded,
+            size: 12,
+            color:
+                _isInsideBoundary ? Colors.greenAccent : Colors.redAccent,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            _isInsideBoundary ? 'In Service Area' : 'Outside Area',
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: _isInsideBoundary
+                  ? Colors.greenAccent
+                  : Colors.redAccent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Color> gradientColors,
+    required bool isAvailable,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: gradientColors[0].withOpacity(isAvailable ? 0.18 : 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Icon container with gradient
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isAvailable
+                        ? gradientColors
+                        : [Colors.grey.shade300, Colors.grey.shade400],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: isAvailable
+                      ? [
+                          BoxShadow(
+                            color: gradientColors[0].withOpacity(0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          )
+                        ]
+                      : [],
+                ),
+                child: Icon(icon, color: Colors.white, size: 26),
+              ),
+              const Spacer(),
+              // Title
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: isAvailable ? textDark : Colors.grey.shade400,
+                ),
+              ),
+              const SizedBox(height: 2),
+              // Subtitle with dot indicator
+              Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: isAvailable
+                          ? gradientColors[0]
+                          : Colors.grey.shade300,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: isAvailable
+                          ? Colors.grey.shade500
+                          : Colors.grey.shade400,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -688,41 +976,16 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     );
   }
 
+  // legacy method kept for reference
   Widget _buildServiceTile(IconData icon, String title, String sub, Color tint,
       Color iconCol, VoidCallback onTap) {
-    return GestureDetector(
+    return _buildServiceCard(
+      icon: icon,
+      title: title,
+      subtitle: sub,
+      gradientColors: [iconCol, iconCol.withOpacity(0.7)],
+      isAvailable: true,
       onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4))
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: tint, shape: BoxShape.circle),
-              child: Icon(icon, color: iconCol, size: 30),
-            ),
-            const SizedBox(height: 12),
-            Text(title,
-                style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: textDark)),
-            Text(sub,
-                style:
-                    GoogleFonts.poppins(fontSize: 10, color: Colors.grey[500])),
-          ],
-        ),
-      ),
     );
   }
 
