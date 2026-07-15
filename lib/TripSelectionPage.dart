@@ -262,10 +262,13 @@ class TripSelectionPage extends StatefulWidget {
 }
 
 class _TripSelectionPageState extends State<TripSelectionPage> {
-  final Color primaryAmber = const Color(0xFFFFB300);
-  final Color bgCream = const Color(0xFFF8F9FA);
-  final Color textDark = const Color(0xFF1A1A2E);
-  final Color cardBg = const Color(0xFFFFFFFF);
+  // Matching the bottom nav bar palette exactly
+  final Color primaryAmber = const Color(0xFFFF8F00);   // activeAccent from nav
+  final Color lightAmber  = const Color(0xFFFFB300);   // warm amber
+  final Color bgCream     = const Color(0xFFFFF9E7);   // navBackground from nav
+  final Color textDark    = const Color(0xFF3E2800);   // deep warm brown
+  final Color cardBg      = const Color(0xFFFFFFFF);
+  final Color mutedTaupe  = const Color(0xFFA89A7B);   // inactiveColor from nav
 
   int userPoints = 0;
   SpinnerContent? spinnerContent;
@@ -528,16 +531,23 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
           SliverToBoxAdapter(
             child: Container(
               width: double.infinity,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
+                  colors: [const Color(0xFFFF8F00), const Color(0xFFFFB300)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.only(
+                borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(36),
                   bottomRight: Radius.circular(36),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF8F00).withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: SafeArea(
                 bottom: false,
@@ -560,7 +570,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                         'Hello there! 👋',
                         style: GoogleFonts.poppins(
                           fontSize: 14,
-                          color: Colors.white60,
+                          color: Colors.white.withOpacity(0.75),
                           fontWeight: FontWeight.w400,
                         ),
                       ),
@@ -575,12 +585,12 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      // Amber accent line
+                      // White accent line
                       Container(
                         width: 48,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: primaryAmber,
+                          color: Colors.white.withOpacity(0.6),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
@@ -754,7 +764,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.12),
+          color: Colors.white.withOpacity(0.25),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -764,12 +774,12 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
               width: 10,
               height: 10,
               child: CircularProgressIndicator(
-                  strokeWidth: 1.5, color: Colors.white70),
+                  strokeWidth: 1.5, color: Colors.white),
             ),
             const SizedBox(width: 6),
             Text('Locating...',
                 style: GoogleFonts.poppins(
-                    fontSize: 11, color: Colors.white70)),
+                    fontSize: 11, color: Colors.white)),
           ],
         ),
       );
@@ -777,14 +787,10 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: _isInsideBoundary
-            ? Colors.green.withOpacity(0.2)
-            : Colors.red.withOpacity(0.2),
+        color: Colors.white.withOpacity(_isInsideBoundary ? 0.3 : 0.2),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: _isInsideBoundary
-              ? Colors.greenAccent.withOpacity(0.5)
-              : Colors.redAccent.withOpacity(0.5),
+          color: Colors.white.withOpacity(0.5),
           width: 1,
         ),
       ),
@@ -794,8 +800,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
           Icon(
             Icons.location_on_rounded,
             size: 12,
-            color:
-                _isInsideBoundary ? Colors.greenAccent : Colors.redAccent,
+            color: Colors.white,
           ),
           const SizedBox(width: 4),
           Text(
@@ -803,9 +808,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
             style: GoogleFonts.poppins(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: _isInsideBoundary
-                  ? Colors.greenAccent
-                  : Colors.redAccent,
+              color: Colors.white,
             ),
           ),
         ],
