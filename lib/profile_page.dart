@@ -155,6 +155,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
     return Scaffold(
       backgroundColor: bgCream,
       appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new, color: theme['text'], size: 20),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            }
+          },
+        ),
         title: Text("Profile",
             style: GoogleFonts.poppins(
                 color: theme['text'],
