@@ -524,12 +524,6 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
         elevation: 0,
         centerTitle: false,
         title: Image.asset('assets/home.png', height: 28),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: PointsWidget(points: userPoints, onTap: _openSpinGame),
-          ),
-        ],
       ),
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
@@ -554,8 +548,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
             ),
           ),
 
-          // 2. Premium Reward Card
-          if (isSpinnerVisible) SliverToBoxAdapter(child: _buildRewardCard()),
+          // 2. Premium Reward Card (Removed as requested)
 
           // 3. Grid of Services
           SliverPadding(
