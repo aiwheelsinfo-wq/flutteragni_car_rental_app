@@ -168,10 +168,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
             icon: Icon(Icons.edit_note_rounded, color: theme['primary']),
             onPressed: () => _showEditProfileDialog(theme),
           ),
-          IconButton(
-            icon: Icon(Icons.logout_rounded, color: theme['primary']),
-            onPressed: () => _showLogoutDialog(theme),
-          )
         ],
       ),
       body: SafeArea(
@@ -280,6 +276,61 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   ),
                 ),
               ],
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () => _showLogoutDialog(theme),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.red.withOpacity(0.2), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.logout_rounded, color: Colors.red, size: 20),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Sign Out",
+                              style: GoogleFonts.poppins(
+                                color: Colors.red[800],
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              "Logout from your account safely",
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: Colors.red),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 30),
             ],
           ),
