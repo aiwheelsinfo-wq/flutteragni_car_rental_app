@@ -100,15 +100,19 @@ class _AgentEarningsPageState extends State<AgentEarningsPage> {
     return earningsBookings.where((b) {
       DateTime bDate;
       try {
-        List<String> dateParts = b['date'].toString().split('-');
-        if (dateParts.length == 3) {
-          bDate = DateTime(
-            int.parse(dateParts[0]),
-            int.parse(dateParts[1]),
-            int.parse(dateParts[2]),
-          );
+        if (b['booked_at'] != null && b['booked_at'].toString().isNotEmpty) {
+          bDate = DateTime.parse(b['booked_at'].toString()).toLocal();
         } else {
-          bDate = DateTime.parse(b['date'].toString()).toLocal();
+          List<String> dateParts = b['date'].toString().split('-');
+          if (dateParts.length == 3) {
+            bDate = DateTime(
+              int.parse(dateParts[0]),
+              int.parse(dateParts[1]),
+              int.parse(dateParts[2]),
+            );
+          } else {
+            bDate = DateTime.parse(b['date'].toString()).toLocal();
+          }
         }
       } catch (_) {
         return true;
