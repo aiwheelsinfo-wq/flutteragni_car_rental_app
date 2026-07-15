@@ -287,6 +287,17 @@ class _FromToMapScreenState extends State<RoundTripFromToMapScreen> {
           100,
         ),
       );
+
+      // ✅ Check boundary immediately
+      if (fromLatLng != null && toLatLng != null) {
+        final boundaryService = BoundaryService();
+        final Map<String, dynamic>? detectedCity = boundaryService.detectCity(fromLatLng!, fromController.text);
+        if (detectedCity != null) {
+          if (boundaryService.isPointInCity(toLatLng!, toController.text, detectedCity)) {
+            _showWithinCityBoundaryDialog(detectedCity["name"]);
+          }
+        }
+      }
     } catch (e) {
       debugPrint("Route API ERROR: $e");
     }
@@ -387,7 +398,14 @@ class _FromToMapScreenState extends State<RoundTripFromToMapScreen> {
                 Navigator.of(context).pop();
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => const LocalTaxi()),
+                  MaterialPageRoute(
+                    builder: (_) => LocalTaxi(
+                      initialFrom: fromController.text,
+                      initialTo: toController.text,
+                      initialFromLatLng: fromLatLng,
+                      initialToLatLng: toLatLng,
+                    ),
+                  ),
                 );
               },
             ),

@@ -126,6 +126,11 @@ class _OneWayDateAndTimeState extends State<OneWayDateAndTime> {
   }
 
   void pickTime() async {
+    if (selectedDate == null) {
+      _showError("Please select a date first");
+      return;
+    }
+
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
@@ -161,10 +166,6 @@ class _OneWayDateAndTimeState extends State<OneWayDateAndTime> {
     );
 
     if (time != null) {
-      if (selectedDate == null) {
-        _showError("Please select a date first");
-        return;
-      }
       final pickedDateTime = DateTime(selectedDate!.year, selectedDate!.month,
           selectedDate!.day, time.hour, time.minute);
       if (pickedDateTime.difference(DateTime.now()).inHours < 5) {

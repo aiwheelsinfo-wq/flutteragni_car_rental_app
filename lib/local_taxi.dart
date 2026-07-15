@@ -14,7 +14,18 @@ import 'localTaxycustomer_reg.dart';
 import 'package:agni_car_rental/config/api_config.dart';
 
 class LocalTaxi extends StatefulWidget {
-  const LocalTaxi({Key? key}) : super(key: key);
+  final String? initialFrom;
+  final String? initialTo;
+  final LatLng? initialFromLatLng;
+  final LatLng? initialToLatLng;
+
+  const LocalTaxi({
+    Key? key,
+    this.initialFrom,
+    this.initialTo,
+    this.initialFromLatLng,
+    this.initialToLatLng,
+  }) : super(key: key);
 
   @override
   _LocalTaxiState createState() => _LocalTaxiState();
@@ -58,7 +69,38 @@ class _LocalTaxiState extends State<LocalTaxi> {
     super.initState();
     fetchApiKey();
     _fetchCityBoundaries();
-    _getCurrentLocation();
+
+    // Check if initial parameters were passed
+    if (widget.initialFrom != null) {
+      fromController.text = widget.initialFrom!;
+      fullAddress = widget.initialFrom!;
+      fromLatLng = widget.initialFromLatLng;
+      if (fromLatLng != null) {
+        markers.add(Marker(
+          markerId: const MarkerId("from"),
+          position: fromLatLng!,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+        ));
+      }
+    } else {
+      _getCurrentLocation();
+    }
+
+    if (widget.initialTo != null) {
+      toController.text = widget.initialTo!;
+      toLatLng = widget.initialToLatLng;
+      if (toLatLng != null) {
+        markers.add(Marker(
+          markerId: const MarkerId("to"),
+          position: toLatLng!,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        ));
+      }
+    }
+
+    if (fromLatLng != null && toLatLng != null) {
+      _calculateDistance();
+    }
 
     fromController.addListener(_onFromChanged);
     toController.addListener(_onToChanged);
@@ -95,6 +137,9 @@ class _LocalTaxiState extends State<LocalTaxi> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() => apiKey = data['apiKey']);
+        if (fromLatLng != null && toLatLng != null) {
+          _calculateDistance();
+        }
       }
     } catch (e) {
       debugPrint('Error: $e');
@@ -190,6 +235,7 @@ class _LocalTaxiState extends State<LocalTaxi> {
       setState(() {
         distanceController.text = "${distanceInKm.toStringAsFixed(1)} km";
         serviceAvailable = distanceInKm <= 80;
+        showCarSection = true;
 
         polylines = {
           Polyline(

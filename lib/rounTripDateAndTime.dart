@@ -69,6 +69,22 @@ class _RoundTripDateAndTimeState extends State<RoundTripDateAndTime> {
   }
 
   void pickTime(bool isDeparture) async {
+    if (isDeparture) {
+      if (departureDate == null) {
+        _showError("Please select departure date first.");
+        return;
+      }
+    } else {
+      if (departureDate == null || departureTime == null) {
+        _showError("Select departure first.");
+        return;
+      }
+      if (returnDate == null) {
+        _showError("Please select return date first.");
+        return;
+      }
+    }
+
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
@@ -104,9 +120,9 @@ class _RoundTripDateAndTimeState extends State<RoundTripDateAndTime> {
       final now = DateTime.now();
       if (isDeparture) {
         final pickedDateTime = DateTime(
-          departureDate?.year ?? now.year,
-          departureDate?.month ?? now.month,
-          departureDate?.day ?? now.day,
+          departureDate!.year,
+          departureDate!.month,
+          departureDate!.day,
           time.hour,
           time.minute,
         );
@@ -121,15 +137,10 @@ class _RoundTripDateAndTimeState extends State<RoundTripDateAndTime> {
           returnTime = null;
         });
       } else {
-        if (departureDate == null || departureTime == null) {
-          _showError("Select departure first.");
-          return;
-        }
-
         final returnDateTime = DateTime(
-          returnDate?.year ?? now.year,
-          returnDate?.month ?? now.month,
-          returnDate?.day ?? now.day,
+          returnDate!.year,
+          returnDate!.month,
+          returnDate!.day,
           time.hour,
           time.minute,
         );

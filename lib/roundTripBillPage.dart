@@ -157,7 +157,11 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
 
     double dailyLimit = widget.kmPerDay;
     int days = _calculateDays();
-    double baseAdvance = dailyLimit * 2 * days;
+    double baseAdvance = dailyLimit * 4.0 * days; // ₹4 per KM advance
+    double baseFare = dailyLimit * widget.kmRate * days; // e.g. ₹13/KM
+    double driverAllowance = widget.driverAllowance * days; // e.g. ₹400/day
+    double rentoxEarning = dailyLimit * 2.0 * days; // ₹2 per KM
+    double vendorEarning = (dailyLimit * 11.0 * days) + driverAllowance; // ₹11 per KM + allowance
     double calculatedCommission = _calculateAgentCommission();
     double totalAdvance = baseAdvance + calculatedCommission;
 
@@ -184,9 +188,11 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
         'business_name': businessNameController.text,
         'business_address': businessAddressController.text,
         'business_pincode': businessPincodeController.text,
+        'base_charge': baseFare.toStringAsFixed(2),
+        'driver_ta': driverAllowance.toStringAsFixed(2),
         'total_amount': totalAdvance.toStringAsFixed(2),
-        'agni_amount': (baseAdvance * 0.10).toStringAsFixed(2),
-        'vendor_amount': (baseAdvance * 0.90).toStringAsFixed(2),
+        'agni_amount': rentoxEarning.toStringAsFixed(2),
+        'vendor_amount': vendorEarning.toStringAsFixed(2),
       });
 
       var res = json.decode(response.body);
@@ -524,7 +530,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
   Widget _buildBottomAction() {
     double dailyLimit = widget.kmPerDay;
     int days = _calculateDays();
-    double baseAdvance = dailyLimit * 2 * days;
+    double baseAdvance = dailyLimit * 4.0 * days;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -573,8 +579,17 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
   Widget _buildAdvancePaymentBreakdownCard() {
     double dailyLimit = widget.kmPerDay;
     int days = _calculateDays();
-    double baseAdvance = dailyLimit * 2 * days;
+    
+    double baseFare = dailyLimit * widget.kmRate * days;
+    double driverAllowance = widget.driverAllowance * days;
+    double gstAmount = baseFare * 0.05;
+    double totalTripAmount = baseFare + driverAllowance + gstAmount;
+    
+    double baseAdvance = dailyLimit * 4.0 * days; // ₹4 per KM advance
     double calculatedCommission = _calculateAgentCommission();
+    double totalAdvancePayable = baseAdvance + calculatedCommission;
+    
+    double balanceToPay = totalTripAmount - baseAdvance;
 
     return Container(
       margin: const EdgeInsets.only(top: 20),
@@ -595,7 +610,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "ADVANCE PAYMENT BREAKDOWN",
+            "FARE BREAKDOWN & CALCULATIONS",
             style: GoogleFonts.poppins(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -608,10 +623,21 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
           const Divider(height: 16),
           _buildBreakdownRow("Number of Days", "$days Days"),
           const Divider(height: 16),
-          _buildBreakdownRow("Daily KM Limit", "${widget.kmPerDay.toStringAsFixed(0)} KM/day",
-              subtitle: "(₹${widget.kmRate.toStringAsFixed(0)}/KM rate applies to actual KM)"),
+          _buildBreakdownRow("Daily KM Limit", "${widget.kmPerDay.toStringAsFixed(0)} KM/day"),
           const Divider(height: 16),
-          _buildBreakdownRow("Base Advance Fare", "₹${baseAdvance.toStringAsFixed(0)}"),
+          _buildBreakdownRow("Base Fare", "₹${baseFare.toStringAsFixed(0)}", 
+              subtitle: "(${dailyLimit.toStringAsFixed(0)} KM/day x $days Days x ₹${widget.kmRate.toStringAsFixed(0)}/KM)"),
+          const Divider(height: 16),
+          _buildBreakdownRow("Driver Allowance", "₹${driverAllowance.toStringAsFixed(0)}",
+              subtitle: "(₹${widget.driverAllowance.toStringAsFixed(0)}/day x $days Days)"),
+          const Divider(height: 16),
+          _buildBreakdownRow("GST (5%)", "₹${gstAmount.toStringAsFixed(0)}"),
+          const Divider(height: 16),
+          _buildBreakdownRow("Total Trip Amount", "₹${totalTripAmount.toStringAsFixed(0)}",
+              isBold: true),
+          const Divider(height: 16),
+          _buildBreakdownRow("Advance Collected Online", "₹${baseAdvance.toStringAsFixed(0)}",
+              subtitle: "(₹4.0/KM x ${dailyLimit.toStringAsFixed(0)} KM/day x $days Days)"),
           if (userType == "agent") ...[
             const Divider(height: 16),
             _buildBreakdownRow(
@@ -626,7 +652,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
             children: [
               Expanded(
                 child: Text(
-                  "Total Advance Payable Now",
+                  "Balance to be Paid to Driver",
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -636,7 +662,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
               ),
               const SizedBox(width: 8),
               Text(
-                "₹${baseAdvance.toStringAsFixed(0)}",
+                "₹${balanceToPay.toStringAsFixed(0)}",
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
@@ -647,7 +673,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
           ),
           const SizedBox(height: 10),
           Text(
-            "*Remaining balance will be calculated after trip completion by the driver based on actual running KM.",
+            "*Remaining balance will be paid directly to the driver at the end of the trip.",
             style: GoogleFonts.poppins(
               fontSize: 10,
               color: Colors.grey[600],
@@ -659,7 +685,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
     );
   }
 
-  Widget _buildBreakdownRow(String label, String value, {String? subtitle}) {
+  Widget _buildBreakdownRow(String label, String value, {String? subtitle, bool isBold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -671,9 +697,9 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
               Text(
                 label,
                 style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey[700],
+                  fontSize: isBold ? 14 : 13,
+                  fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+                  color: isBold ? Colors.black87 : Colors.grey[700],
                 ),
               ),
               if (subtitle != null) ...[
@@ -693,9 +719,9 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
         Text(
           value,
           style: GoogleFonts.poppins(
-            fontSize: 13,
+            fontSize: isBold ? 15 : 13,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: isBold ? Colors.black87 : Colors.black87,
           ),
         ),
       ],

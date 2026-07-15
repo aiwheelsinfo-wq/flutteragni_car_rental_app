@@ -190,13 +190,6 @@ class _RoundtripcarselectionState extends State<Roundtripcarselection> {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-                color: Colors.white12, borderRadius: BorderRadius.circular(10)),
-            child:
-                const Icon(Icons.edit_calendar, color: Colors.white, size: 20),
-          )
         ],
       ),
     );
@@ -331,7 +324,7 @@ class _RoundtripcarselectionState extends State<Roundtripcarselection> {
                       "₹${car.driverAllowance}/day"),
                   const Divider(),
                   _rowDetail(
-                      Icons.receipt_long, "GST", "${car.gstPercent}% Included"),
+                      Icons.receipt_long, "GST", "${car.gstPercent}%"),
                   const Divider(),
                   _rowDetail(
                       Icons.info_outline, "Terms", "Garage-to-Garage billing"),
