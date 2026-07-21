@@ -297,7 +297,10 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     checkForUpdate();
     _checkCurrentLocationBoundary();
 
-    lifecycle = LifecycleService(onResume: checkNotification);
+    lifecycle = LifecycleService(onResume: () {
+      checkNotification();
+      _checkCurrentLocationBoundary();
+    });
     lifecycle.init();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -655,7 +658,25 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                       ? [const Color(0xFFFF8008), const Color(0xFFFFC837)]
                       : [const Color(0xFF9E9E9E), const Color(0xFFBDBDBD)],
                   isAvailable: _isInsideBoundary,
-                  onTap: () {
+                  onTap: () async {
+                    bool gpsEnabled = await Geolocator.isLocationServiceEnabled();
+                    if (!gpsEnabled) {
+                      _showGPSDisabledDialog();
+                      return;
+                    }
+                    LocationPermission permission = await Geolocator.checkPermission();
+                    if (permission == LocationPermission.denied) {
+                      permission = await Geolocator.requestPermission();
+                    }
+                    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+                      _showPermissionDeniedDialog();
+                      return;
+                    }
+
+                    if (!_isInsideBoundary) {
+                      await _checkCurrentLocationBoundary();
+                    }
+
                     if (_isInsideBoundary) {
                       Navigator.push(
                         context,
@@ -676,7 +697,25 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                       ? [const Color(0xFF7B2FF7), const Color(0xFFF107A3)]
                       : [const Color(0xFF9E9E9E), const Color(0xFFBDBDBD)],
                   isAvailable: _isInsideBoundary,
-                  onTap: () {
+                  onTap: () async {
+                    bool gpsEnabled = await Geolocator.isLocationServiceEnabled();
+                    if (!gpsEnabled) {
+                      _showGPSDisabledDialog();
+                      return;
+                    }
+                    LocationPermission permission = await Geolocator.checkPermission();
+                    if (permission == LocationPermission.denied) {
+                      permission = await Geolocator.requestPermission();
+                    }
+                    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+                      _showPermissionDeniedDialog();
+                      return;
+                    }
+
+                    if (!_isInsideBoundary) {
+                      await _checkCurrentLocationBoundary();
+                    }
+
                     if (_isInsideBoundary) {
                       Navigator.push(
                         context,
@@ -1003,6 +1042,75 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
           ),
           content: Text(
             "You are outside the boundary. Local Cab/Duty is not available in this location. Please choose One-Way or Round-Trip instead.",
+            style: GoogleFonts.poppins(),
+          ),
+          actions: [
+            TextButton(
+              child: Text(
+                "OK",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: primaryAmber),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showGPSDisabledDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            "GPS Disabled",
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.amber[900]),
+          ),
+          content: Text(
+            "Location services are disabled. Please turn on GPS to book a taxi.",
+            style: GoogleFonts.poppins(),
+          ),
+          actions: [
+            TextButton(
+              child: Text(
+                "Cancel",
+                style: GoogleFonts.poppins(color: Colors.grey),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryAmber,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(
+                "Turn on GPS",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await Geolocator.openLocationSettings();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPermissionDeniedDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            "Location Permission Denied",
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.red),
+          ),
+          content: Text(
+            "Location permission is required to book local cabs. Please grant location access in settings.",
             style: GoogleFonts.poppins(),
           ),
           actions: [

@@ -212,6 +212,14 @@ class _InvoicePageState extends State<InvoicePage> {
     double kmRate =
         double.tryParse(invoiceData['kmRate']?.toString() ?? '') ?? 0.0;
     double gstPercent = double.parse(invoiceData['gstPercent'].toString());
+    bool isIntraState = true;
+    String custGst = (invoiceData['gst_number'] ?? '').trim();
+    if (custGst.isNotEmpty && custGst != 'Not Generated' && custGst != 'None') {
+      String stateCode = custGst.length >= 2 ? custGst.substring(0, 2) : '';
+      if (stateCode.isNotEmpty && stateCode != '27') {
+        isIntraState = false;
+      }
+    }
     double? agent_commission =
         double.tryParse(invoiceData['agent_commission'].toString()) ?? 0.0;
     double? permit_charge =
@@ -545,7 +553,12 @@ class _InvoicePageState extends State<InvoicePage> {
 
                   if (invoiceData['trip_type'] != 'Local-taxi') ...[
                     _buildPdfTableRow('GSTIN', '27AABPG5706A3ZB', ''),
-                    _buildPdfTableRow('GST $gstPercent%', '', '$gst'),
+                    if (isIntraState) ...[
+                      _buildPdfTableRow('CGST ${(gstPercent / 2).toStringAsFixed(1)}%', '', '${(gst! / 2).toStringAsFixed(2)}'),
+                      _buildPdfTableRow('SGST ${(gstPercent / 2).toStringAsFixed(1)}%', '', '${(gst! / 2).toStringAsFixed(2)}'),
+                    ] else ...[
+                      _buildPdfTableRow('IGST ${gstPercent.toStringAsFixed(1)}%', '', '${gst!.toStringAsFixed(2)}'),
+                    ],
                   ],
 
                   _buildPdfTableRow('TOTAL', '', '$netTotal'),
@@ -801,6 +814,14 @@ class _InvoicePageState extends State<InvoicePage> {
     double kmRate =
         double.tryParse(invoiceData['kmRate']?.toString() ?? '') ?? 0.0;
     double gstPercent = double.parse(invoiceData['gstPercent'].toString());
+    bool isIntraState = true;
+    String custGst = (invoiceData['gst_number'] ?? '').trim();
+    if (custGst.isNotEmpty && custGst != 'Not Generated' && custGst != 'None') {
+      String stateCode = custGst.length >= 2 ? custGst.substring(0, 2) : '';
+      if (stateCode.isNotEmpty && stateCode != '27') {
+        isIntraState = false;
+      }
+    }
     double? agent_commission =
         double.tryParse(invoiceData['agent_commission'].toString()) ?? 0.0;
     double? permit_charge =
@@ -1007,7 +1028,12 @@ class _InvoicePageState extends State<InvoicePage> {
 
         if (invoiceData['trip_type'] != 'Local-taxi') ...[
           _buildTableRow('GSTIN', '27AABPG5706A3ZB', ''),
-          _buildTableRow('GST $gstPercent%', '', '$gst'),
+          if (isIntraState) ...[
+            _buildTableRow('CGST ${(gstPercent / 2).toStringAsFixed(1)}%', '', '${(gst! / 2).toStringAsFixed(2)}'),
+            _buildTableRow('SGST ${(gstPercent / 2).toStringAsFixed(1)}%', '', '${(gst! / 2).toStringAsFixed(2)}'),
+          ] else ...[
+            _buildTableRow('IGST ${gstPercent.toStringAsFixed(1)}%', '', '${gst!.toStringAsFixed(2)}'),
+          ],
         ],
 
         _buildTableRow('TOTAL', '', '$netTotal'),
