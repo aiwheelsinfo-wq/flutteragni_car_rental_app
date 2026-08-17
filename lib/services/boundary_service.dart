@@ -35,6 +35,9 @@ class BoundaryService {
       }
     } catch (e) {
       debugPrint('BoundaryService Error: $e');
+    }
+  }
+
   List<LatLng> getPolygonPoints(Map<String, dynamic> city) {
     String? rawJson = city['polygonCoords']?.toString();
     if (rawJson != null && rawJson.trim().isNotEmpty && rawJson != 'null') {
