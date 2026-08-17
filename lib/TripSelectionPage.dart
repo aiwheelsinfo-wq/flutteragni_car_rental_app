@@ -280,6 +280,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
   DateTime? lastNotificationFetch;
   bool _isInsideBoundary = false;
   bool _isCheckingLocation = true;
+  String _activeCitiesText = '';
 
   final List<String> imageUrls = [
     'https://agnicarrental.com/driver2025/add/add1.webp',
@@ -314,6 +315,12 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
       final boundaryService = BoundaryService();
       await boundaryService.fetchCityBoundaries();
 
+      final cityNames = boundaryService.majorCities
+          .map((c) => c['name']?.toString() ?? '')
+          .where((n) => n.isNotEmpty)
+          .toList();
+      final activeCities = cityNames.join(' • ');
+
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -328,11 +335,13 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
           "",
         );
         setState(() {
+          _activeCitiesText = activeCities;
           _isInsideBoundary = (detected != null);
           _isCheckingLocation = false;
         });
       } else {
         setState(() {
+          _activeCitiesText = activeCities;
           _isInsideBoundary = false;
           _isCheckingLocation = false;
         });
@@ -717,7 +726,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Local Services',
+                            'Active Service Cities',
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
@@ -726,13 +735,14 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                           ),
                           Text(
                             _isCheckingLocation
-                                ? 'Checking your location...'
-                                : _isInsideBoundary
-                                    ? 'Local Cab & Duty available in your area'
-                                    : 'Local services not available in your current area',
+                                ? 'Loading active cities...'
+                                : _activeCitiesText.isNotEmpty
+                                    ? 'Local Cab & Duty Available In: $_activeCitiesText'
+                                    : 'Local Cab & Duty available in active cities',
                             style: GoogleFonts.poppins(
                               fontSize: 11,
-                              color: Colors.grey[500],
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFFD97706),
                             ),
                           ),
                         ],
