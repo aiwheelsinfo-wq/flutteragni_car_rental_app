@@ -78,7 +78,7 @@ class _InvoicePageState extends State<InvoicePage> {
   Future<void> fetchInvoiceData(String invoiceId) async {
     userType = await secureStorage.read(key: "userType");
     final url = Uri.parse(
-        "${ApiConfig.baseUrl}/get_invoice_data.php/get_invoice_data.php?bookingId=${widget.bookingId}");
+        "${ApiConfig.baseUrl}/get_invoice_data.php?bookingId=${widget.bookingId}");
 
     try {
       final response = await http.get(url);
@@ -350,17 +350,14 @@ class _InvoicePageState extends State<InvoicePage> {
 
       baceAmount = invoiceData['total_amount'] != '0'
           ? double.parse(invoiceData['total_amount'].toString())
-          : (distance * kmRate) + driver_allowanceVal;
+          : (distance * kmRate) + driver_allowanceVal + agent_commission;
 
-      double totalbeforeGst = (distance * kmRate) + agent_commission;
+      double totalbeforeGst = baceAmount;
 
       gst = baceAmount * gstPercent / 100;
-      netTotal = baceAmount + gst + parking_charge;
+      netTotal = baceAmount + gst + parking_charge + toll_charge + permit_charge;
 
-      base_charge = double.tryParse(invoiceData['base_charge']?.toString() ?? '') ?? 0.0;
-      if (base_charge == 0.0) {
-        base_charge = baceAmount - agent_commission;
-      }
+      base_charge = baceAmount;
 
       // Format all values to 2 decimal places
       baceAmount = double.parse(baceAmount.toStringAsFixed(2));
@@ -546,9 +543,8 @@ class _InvoicePageState extends State<InvoicePage> {
                   _buildPdfTableRow('Driver Allowance', '', '${driver_allowance ?? ""} '),
 
                   if (invoiceData['trip_type'] == 'One-way') ...[
-                    _buildPdfTableRow('Base Amount', '', '${base_charge.toStringAsFixed(2)}'),
-                    _buildPdfTableRow('Agent Commission', '', '${agent_commission.toStringAsFixed(2)}'),
-                    _buildPdfTableRow('Total Charge', '', '$baceAmount')
+                    _buildPdfTableRow('Base Amount', '', '${baceAmount!.toStringAsFixed(2)}'),
+                    _buildPdfTableRow('Total Charge', '', '${(baceAmount! + parking_charge! + toll_charge! + permit_charge!).toStringAsFixed(2)}'),
                   ],
 
                   if (invoiceData['trip_type'] != 'Local-taxi') ...[
@@ -946,29 +942,27 @@ class _InvoicePageState extends State<InvoicePage> {
     double base_charge = 0.0;
     if (invoiceData['trip_type'] == 'One-way') {
       double distance = double.parse(invoiceData['distance'].toString());
-      double driver_allowance;
+      double driver_allowanceVal;
 
-      driver_allowance = (distance < 200) ? 300 : 400;
+      driver_allowanceVal = (distance < 200) ? 300 : 400;
 
       baceAmount = invoiceData['total_amount'] != '0'
           ? double.parse(invoiceData['total_amount'].toString())
-          : (distance * kmRate) + driver_allowance;
+          : (distance * kmRate) + driver_allowanceVal + agent_commission;
 
-      double totalbeforeGst = (distance * kmRate) + agent_commission;
+      double totalbeforeGst = baceAmount;
 
       gst = baceAmount * gstPercent / 100;
-      netTotal = baceAmount + gst + parking_charge;
+      netTotal = baceAmount + gst + parking_charge + toll_charge + permit_charge;
 
-      base_charge = double.tryParse(invoiceData['base_charge']?.toString() ?? '') ?? 0.0;
-      if (base_charge == 0.0) {
-        base_charge = baceAmount - agent_commission;
-      }
+      base_charge = baceAmount;
 
       // Format all values to 2 decimal places
       baceAmount = double.parse(baceAmount.toStringAsFixed(2));
       totalbeforeGst = double.parse(totalbeforeGst.toStringAsFixed(2));
       gst = double.parse(gst.toStringAsFixed(2));
       netTotal = double.parse(netTotal.toStringAsFixed(2));
+      driver_allowance = driver_allowanceVal.toString();
     }
 
     if (invoiceData['trip_type'] == 'Local-taxi') {
@@ -1021,9 +1015,8 @@ class _InvoicePageState extends State<InvoicePage> {
         _buildTableRow('Driver Allowance', '', '${driver_allowance ?? ""} '),
 
         if (invoiceData['trip_type'] == 'One-way') ...[
-          _buildTableRow('Base Amount', '', '${base_charge.toStringAsFixed(2)}'),
-          _buildTableRow('Agent Commission', '', '${agent_commission.toStringAsFixed(2)}'),
-          _buildTableRow('Total Charge', '', '$baceAmount')
+          _buildTableRow('Base Amount', '', '${baceAmount!.toStringAsFixed(2)}'),
+          _buildTableRow('Total Charge', '', '${(baceAmount! + parking_charge! + toll_charge! + permit_charge!).toStringAsFixed(2)}'),
         ],
 
         if (invoiceData['trip_type'] != 'Local-taxi') ...[
