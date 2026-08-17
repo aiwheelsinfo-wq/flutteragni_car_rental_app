@@ -22,7 +22,6 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
 
   static const LatLng _initialCenter = LatLng(19.1500, 73.1000); // Default view over MH
 
-  // Palette of distinct, high-visibility colors for boundaries
   static const List<Color> _boundaryColors = [
     Color(0xFFFF5722), // Vibrant Deep Orange
     Color(0xFF2196F3), // Electric Blue
@@ -45,62 +44,9 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
       await _boundaryService.fetchCityBoundaries();
       final cities = _boundaryService.majorCities;
       
-      final Set<Polygon> loadedPolygons = {};
-      final Set<Marker> loadedMarkers = {};
-
-      for (int i = 0; i < cities.length; i++) {
-        final city = cities[i];
-        final String cityName = city['name'] ?? 'City ${i + 1}';
-        final List<LatLng> points = List<LatLng>.from(city['points'] ?? []);
-        final Color color = _boundaryColors[i % _boundaryColors.length];
-
-        if (points.isNotEmpty) {
-          // 1. Draw bold boundary polygon with fill
-          loadedPolygons.add(
-            Polygon(
-              polygonId: PolygonId(cityName),
-              points: points,
-              strokeWidth: 4,
-              strokeColor: color,
-              fillColor: color.withOpacity(0.28),
-            ),
-          );
-
-          // 2. Calculate center of polygon for pin marker
-          double sumLat = 0;
-          double sumLng = 0;
-          for (var p in points) {
-            sumLat += p.latitude;
-            sumLng += p.longitude;
-          }
-          final LatLng center = LatLng(sumLat / points.length, sumLng / points.length);
-
-          // 3. Add marker pin with info window
-          loadedMarkers.add(
-            Marker(
-              markerId: MarkerId(cityName),
-              position: center,
-              infoWindow: InfoWindow(
-                title: '$cityName Local Area',
-                snippet: 'Local Cab & Duty Available Here',
-              ),
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                _getHueForColor(color),
-              ),
-              onTap: () {
-                setState(() => _selectedCityName = cityName);
-              },
-            ),
-          );
-        }
-      }
-
-      setState(() {
-        _cities = cities;
-        _polygons = loadedPolygons;
-        _markers = loadedMarkers;
-        _isLoading = false;
-      });
+      _cities = cities;
+      _isLoading = false;
+      _rebuildMapElements();
 
       if (cities.isNotEmpty && _mapController != null) {
         _fitAllBoundaries();
@@ -109,6 +55,63 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
       debugPrint("Error loading boundaries map: $e");
       setState(() => _isLoading = false);
     }
+  }
+
+  void _rebuildMapElements() {
+    final Set<Polygon> loadedPolygons = {};
+    final Set<Marker> loadedMarkers = {};
+
+    for (int i = 0; i < _cities.length; i++) {
+      final city = _cities[i];
+      final String cityName = city['name'] ?? 'City ${i + 1}';
+      final List<LatLng> points = List<LatLng>.from(city['points'] ?? []);
+      final Color baseColor = _boundaryColors[i % _boundaryColors.length];
+      final bool isSelected = _selectedCityName == cityName;
+
+      if (points.isNotEmpty) {
+        // Highlight selected city polygon with thicker stroke and stronger fill
+        loadedPolygons.add(
+          Polygon(
+            polygonId: PolygonId(cityName),
+            points: points,
+            strokeWidth: isSelected ? 6 : 3,
+            strokeColor: isSelected ? Colors.amberAccent : baseColor,
+            fillColor: isSelected ? baseColor.withOpacity(0.45) : baseColor.withOpacity(0.22),
+          ),
+        );
+
+        // Calculate center of polygon for marker
+        double sumLat = 0;
+        double sumLng = 0;
+        for (var p in points) {
+          sumLat += p.latitude;
+          sumLng += p.longitude;
+        }
+        final LatLng center = LatLng(sumLat / points.length, sumLng / points.length);
+
+        loadedMarkers.add(
+          Marker(
+            markerId: MarkerId(cityName),
+            position: center,
+            infoWindow: InfoWindow(
+              title: '📍 $cityName Service Area',
+              snippet: 'Local Cab & Duty Available Here',
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              _getHueForColor(baseColor),
+            ),
+            onTap: () {
+              _zoomToCity(city);
+            },
+          ),
+        );
+      }
+    }
+
+    setState(() {
+      _polygons = loadedPolygons;
+      _markers = loadedMarkers;
+    });
   }
 
   double _getHueForColor(Color color) {
@@ -139,13 +142,14 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
 
     if (minLat < maxLat && minLng < maxLng) {
       setState(() => _selectedCityName = null);
+      _rebuildMapElements();
       _mapController!.animateCamera(
         CameraUpdate.newLatLngBounds(
           LatLngBounds(
             southwest: LatLng(minLat, minLng),
             northeast: LatLng(maxLat, maxLng),
           ),
-          70.0, // padding
+          70.0,
         ),
       );
     }
@@ -157,6 +161,7 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
     if (points.isEmpty) return;
 
     setState(() => _selectedCityName = cityName);
+    _rebuildMapElements();
 
     double minLat = 90.0, maxLat = -90.0;
     double minLng = 180.0, maxLng = -180.0;
@@ -168,13 +173,16 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
       if (p.longitude > maxLng) maxLng = p.longitude;
     }
 
+    // Show info window for selected city marker
+    _mapController?.showMarkerInfoWindow(MarkerId(cityName));
+
     _mapController?.animateCamera(
       CameraUpdate.newLatLngBounds(
         LatLngBounds(
           southwest: LatLng(minLat, minLng),
           northeast: LatLng(maxLat, maxLng),
         ),
-        55.0,
+        60.0,
       ),
     );
   }
@@ -184,7 +192,7 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Active Service Areas',
+          _selectedCityName != null ? '$_selectedCityName Boundary' : 'Active Service Areas',
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 17),
         ),
@@ -225,46 +233,64 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
             },
           ),
 
-          // 2. Map Legend / Banner Top Float
+          // 2. Map Legend / Selected City Header Banner
           Positioned(
             top: 14,
             left: 14,
             right: 14,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF14141E).withOpacity(0.92),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  )
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFF5722),
-                      shape: BoxShape.circle,
-                    ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: Container(
+                key: ValueKey(_selectedCityName),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF14141E).withOpacity(0.94),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _selectedCityName != null ? const Color(0xFFFFC107) : Colors.white12,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Colored areas on map indicate local service boundaries',
-                      style: GoogleFonts.poppins(
-                        color: Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    )
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _selectedCityName != null ? Icons.stars_rounded : Icons.info_outline_rounded,
+                      color: const Color(0xFFFFC107),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _selectedCityName != null
+                            ? 'Showing boundary for $_selectedCityName. Local Cab & Duty available!'
+                            : 'Colored areas on map indicate active local service boundaries',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: _selectedCityName != null ? FontWeight.bold : FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    if (_selectedCityName != null)
+                      GestureDetector(
+                        onTap: _fitAllBoundaries,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.white24,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close_rounded, size: 16, color: Colors.white),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -278,7 +304,7 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
               ),
             ),
 
-          // 4. Bottom City Selector Card (Fixed Overflow Bug)
+          // 4. Bottom City Selector Card
           if (!_isLoading && _cities.isNotEmpty)
             Positioned(
               left: 14,
@@ -302,7 +328,6 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header Row with Expanded text to prevent overflow
                     Row(
                       children: [
                         const Icon(Icons.check_circle_rounded, color: Color(0xFFFFC107), size: 18),
@@ -320,7 +345,7 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Tap city to view',
+                          'Tap city to focus',
                           style: GoogleFonts.poppins(
                             color: Colors.white54,
                             fontSize: 11,
@@ -330,7 +355,6 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
                     ),
                     const SizedBox(height: 12),
 
-                    // City Chips Horizontal Scroll
                     SizedBox(
                       height: 44,
                       child: ListView.builder(
@@ -352,8 +376,8 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
                                 color: isSelected ? cityColor : Colors.white.withOpacity(0.08),
                                 borderRadius: BorderRadius.circular(22),
                                 border: Border.all(
-                                  color: isSelected ? Colors.transparent : cityColor.withOpacity(0.6),
-                                  width: 1.5,
+                                  color: isSelected ? Colors.amberAccent : cityColor.withOpacity(0.6),
+                                  width: isSelected ? 2.0 : 1.5,
                                 ),
                               ),
                               child: Row(
