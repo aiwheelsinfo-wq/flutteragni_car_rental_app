@@ -35,6 +35,39 @@ class BoundaryService {
       }
     } catch (e) {
       debugPrint('BoundaryService Error: $e');
+  List<LatLng> getPolygonPoints(Map<String, dynamic> city) {
+    String? rawJson = city['polygonCoords']?.toString();
+    if (rawJson != null && rawJson.trim().isNotEmpty && rawJson != 'null') {
+      try {
+        final List<dynamic> coords = jsonDecode(rawJson);
+        final List<LatLng> points = coords.map((c) {
+          return LatLng(
+            double.parse(c['lat'].toString()),
+            double.parse(c['lng'].toString()),
+          );
+        }).toList();
+        if (points.isNotEmpty) return points;
+      } catch (e) {
+        debugPrint("Error parsing polygonCoords for ${city['name']}: $e");
+      }
+    }
+
+    // Fallback: Rectangle boundary from minLat, maxLat, minLng, maxLng
+    try {
+      final double minLat = double.parse(city["minLat"].toString());
+      final double maxLat = double.parse(city["maxLat"].toString());
+      final double minLng = double.parse(city["minLng"].toString());
+      final double maxLng = double.parse(city["maxLng"].toString());
+
+      return [
+        LatLng(minLat, minLng),
+        LatLng(maxLat, minLng),
+        LatLng(maxLat, maxLng),
+        LatLng(minLat, maxLng),
+      ];
+    } catch (e) {
+      debugPrint("Error creating bounding box for ${city['name']}: $e");
+      return [];
     }
   }
 

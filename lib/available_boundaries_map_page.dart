@@ -64,7 +64,7 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
     for (int i = 0; i < _cities.length; i++) {
       final city = _cities[i];
       final String cityName = city['name'] ?? 'City ${i + 1}';
-      final List<LatLng> points = List<LatLng>.from(city['points'] ?? []);
+      final List<LatLng> points = _boundaryService.getPolygonPoints(city);
       final Color baseColor = _boundaryColors[i % _boundaryColors.length];
       final bool isSelected = _selectedCityName == cityName;
 
@@ -131,7 +131,7 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
     double minLng = 180.0, maxLng = -180.0;
 
     for (var city in _cities) {
-      List<LatLng> points = List<LatLng>.from(city['points'] ?? []);
+      List<LatLng> points = _boundaryService.getPolygonPoints(city);
       for (var p in points) {
         if (p.latitude < minLat) minLat = p.latitude;
         if (p.latitude > maxLat) maxLat = p.latitude;
@@ -157,7 +157,7 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
 
   void _zoomToCity(Map<String, dynamic> city) {
     final String cityName = city['name'] ?? '';
-    final List<LatLng> points = List<LatLng>.from(city['points'] ?? []);
+    final List<LatLng> points = _boundaryService.getPolygonPoints(city);
     if (points.isEmpty) return;
 
     setState(() => _selectedCityName = cityName);
