@@ -654,76 +654,28 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                   icon: Icons.timer_rounded,
                   title: 'Local Duty',
                   subtitle: '8hr / 80km',
-                  gradientColors: _isInsideBoundary
-                      ? [const Color(0xFFFF8008), const Color(0xFFFFC837)]
-                      : [const Color(0xFF9E9E9E), const Color(0xFFBDBDBD)],
-                  isAvailable: _isInsideBoundary,
-                  onTap: () async {
-                    bool gpsEnabled = await Geolocator.isLocationServiceEnabled();
-                    if (!gpsEnabled) {
-                      _showGPSDisabledDialog();
-                      return;
-                    }
-                    LocationPermission permission = await Geolocator.checkPermission();
-                    if (permission == LocationPermission.denied) {
-                      permission = await Geolocator.requestPermission();
-                    }
-                    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-                      _showPermissionDeniedDialog();
-                      return;
-                    }
-
-                    if (!_isInsideBoundary) {
-                      await _checkCurrentLocationBoundary();
-                    }
-
-                    if (_isInsideBoundary) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => LocalDutyBookingForm(fromLocation: ''),
-                        ),
-                      );
-                    } else {
-                      _showServiceDisabledDialog(context, 'Local Duty');
-                    }
+                  gradientColors: const [Color(0xFFFF8008), Color(0xFFFFC837)],
+                  isAvailable: true,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LocalDutyBookingForm(fromLocation: ''),
+                      ),
+                    );
                   },
                 ),
                 _buildServiceCard(
                   icon: Icons.local_taxi_rounded,
                   title: 'Local Cab',
                   subtitle: 'Quick Ride',
-                  gradientColors: _isInsideBoundary
-                      ? [const Color(0xFF7B2FF7), const Color(0xFFF107A3)]
-                      : [const Color(0xFF9E9E9E), const Color(0xFFBDBDBD)],
-                  isAvailable: _isInsideBoundary,
-                  onTap: () async {
-                    bool gpsEnabled = await Geolocator.isLocationServiceEnabled();
-                    if (!gpsEnabled) {
-                      _showGPSDisabledDialog();
-                      return;
-                    }
-                    LocationPermission permission = await Geolocator.checkPermission();
-                    if (permission == LocationPermission.denied) {
-                      permission = await Geolocator.requestPermission();
-                    }
-                    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-                      _showPermissionDeniedDialog();
-                      return;
-                    }
-
-                    if (!_isInsideBoundary) {
-                      await _checkCurrentLocationBoundary();
-                    }
-
-                    if (_isInsideBoundary) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => LocalTaxi()),
-                      );
-                    } else {
-                      _showServiceDisabledDialog(context, 'Local Cab');
-                    }
+                  gradientColors: const [Color(0xFF7B2FF7), Color(0xFFF107A3)],
+                  isAvailable: true,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => LocalTaxi()),
+                    );
                   },
                 ),
               ],
