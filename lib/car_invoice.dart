@@ -538,13 +538,15 @@ class _InvoicePageState extends State<InvoicePage> {
                   ],
 
                   _buildPdfTableRow('Parking', '', '$parking_charge'),
-                  _buildPdfTableRow('Toll', '', '$toll_charge'),
-                  _buildPdfTableRow('Permit Charge', '', '$permit_charge'),
+                  if (invoiceData['trip_type'] != 'One-way') ...[
+                    _buildPdfTableRow('Toll', '', '$toll_charge'),
+                    _buildPdfTableRow('Permit Charge', '', '$permit_charge'),
+                  ],
                   _buildPdfTableRow('Driver Allowance', '', '${driver_allowance ?? ""} '),
 
                   if (invoiceData['trip_type'] == 'One-way') ...[
                     _buildPdfTableRow('Base Amount', '', '${baceAmount!.toStringAsFixed(2)}'),
-                    _buildPdfTableRow('Total Charge', '', '${(baceAmount! + parking_charge! + toll_charge! + permit_charge!).toStringAsFixed(2)}'),
+                    _buildPdfTableRow('Total Charge', '', '${(baceAmount! + parking_charge!).toStringAsFixed(2)}'),
                   ],
 
                   if (invoiceData['trip_type'] != 'Local-taxi') ...[
@@ -1010,13 +1012,15 @@ class _InvoicePageState extends State<InvoicePage> {
         ],
 
         _buildTableRow('Parking', '', '$parking_charge'),
-        _buildTableRow('Toll', '', '$toll_charge'),
-        _buildTableRow('Permit Charge', '', '$permit_charge'),
+        if (invoiceData['trip_type'] != 'One-way') ...[
+          _buildTableRow('Toll', '', '$toll_charge'),
+          _buildTableRow('Permit Charge', '', '$permit_charge'),
+        ],
         _buildTableRow('Driver Allowance', '', '${driver_allowance ?? ""} '),
 
         if (invoiceData['trip_type'] == 'One-way') ...[
           _buildTableRow('Base Amount', '', '${baceAmount!.toStringAsFixed(2)}'),
-          _buildTableRow('Total Charge', '', '${(baceAmount! + parking_charge! + toll_charge! + permit_charge!).toStringAsFixed(2)}'),
+          _buildTableRow('Total Charge', '', '${(baceAmount! + parking_charge!).toStringAsFixed(2)}'),
         ],
 
         if (invoiceData['trip_type'] != 'Local-taxi') ...[
