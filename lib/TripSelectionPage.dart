@@ -21,6 +21,7 @@ import 'roundTripRegistration.dart';
 import 'spinner.dart';
 import 'pointcount.dart';
 import 'services/boundary_service.dart';
+import 'available_boundaries_map_page.dart';
 
 /// =========================
 /// NOTIFICATION SERVICE
@@ -280,7 +281,6 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
   DateTime? lastNotificationFetch;
   bool _isInsideBoundary = false;
   bool _isCheckingLocation = true;
-  String _activeCitiesText = '';
 
   final List<String> imageUrls = [
     'https://agnicarrental.com/driver2025/add/add1.webp',
@@ -315,12 +315,6 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
       final boundaryService = BoundaryService();
       await boundaryService.fetchCityBoundaries();
 
-      final cityNames = boundaryService.majorCities
-          .map((c) => c['name']?.toString() ?? '')
-          .where((n) => n.isNotEmpty)
-          .toList();
-      final activeCities = cityNames.join(' • ');
-
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -335,13 +329,11 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
           "",
         );
         setState(() {
-          _activeCitiesText = activeCities;
           _isInsideBoundary = (detected != null);
           _isCheckingLocation = false;
         });
       } else {
         setState(() {
-          _activeCitiesText = activeCities;
           _isInsideBoundary = false;
           _isCheckingLocation = false;
         });
@@ -691,64 +683,72 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
             ),
           ),
 
-          // ─── Info Banner ───
+          // ─── Info Banner (Opens Interactive Boundaries Map) ───
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AvailableBoundariesMapPage(),
                     ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: primaryAmber.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(14),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: primaryAmber.withOpacity(0.3)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
-                      child: Icon(Icons.info_outline_rounded,
-                          color: primaryAmber, size: 22),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Active Service Cities',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: textDark,
-                            ),
-                          ),
-                          Text(
-                            _isCheckingLocation
-                                ? 'Loading active cities...'
-                                : _activeCitiesText.isNotEmpty
-                                    ? 'Local Cab & Duty Available In: $_activeCitiesText'
-                                    : 'Local Cab & Duty available in active cities',
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFFD97706),
-                            ),
-                          ),
-                        ],
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: primaryAmber.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(Icons.map_rounded,
+                            color: primaryAmber, size: 24),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'View Active Service Areas Map',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: textDark,
+                              ),
+                            ),
+                            Text(
+                              'Tap to view all available local city boundaries on map',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward_ios_rounded,
+                          size: 14, color: Colors.grey[400]),
+                    ],
+                  ),
                 ),
               ),
             ),
