@@ -409,7 +409,12 @@ class _ShowBillPageState extends State<ShowBillPage> {
                 const SizedBox(height: 20),
                 _buildFareRow("Base Fare",
                     baseTripFare - widget.tollCharge - widget.driverTa),
-                _buildFareRow("Driver Allowance", widget.driverTa),
+                _buildFareRow("Driver Allowance",
+                    _isEarlyMorningTime(widget.tripTime) && widget.driverTa >= 600
+                        ? (widget.driverTa - 300)
+                        : widget.driverTa),
+                if (_isEarlyMorningTime(widget.tripTime))
+                  _buildFareRow("Early Morning Allowance (1AM-6AM)", 300),
                 _buildFareRow("Toll Charges (Included)", widget.tollCharge),
                 if (widget.commission > 0)
                   _buildFareRow("Agent Commission", commissionWithTax),
@@ -534,6 +539,33 @@ class _ShowBillPageState extends State<ShowBillPage> {
         ],
       ),
     );
+  }
+
+  bool _isEarlyMorningTime(String timeStr) {
+    if (timeStr.isEmpty) return false;
+    try {
+      final clean = timeStr.trim().toUpperCase();
+      int hour = -1;
+      int minute = 0;
+      if (clean.contains('AM') || clean.contains('PM')) {
+        final parts =
+            clean.replaceAll('AM', '').replaceAll('PM', '').trim().split(':');
+        hour = int.parse(parts[0]);
+        if (parts.length > 1) minute = int.parse(parts[1]);
+        if (clean.contains('AM')) {
+          if (hour == 12) hour = 0;
+        } else if (clean.contains('PM')) {
+          if (hour != 12) hour += 12;
+        }
+      } else {
+        final parts = clean.split(':');
+        hour = int.parse(parts[0]);
+        if (parts.length > 1) minute = int.parse(parts[1]);
+      }
+      return (hour >= 1 && hour < 6) || (hour == 6 && minute == 0);
+    } catch (_) {
+      return false;
+    }
   }
 
   Widget _buildRouteTimeline(String from, String to) {

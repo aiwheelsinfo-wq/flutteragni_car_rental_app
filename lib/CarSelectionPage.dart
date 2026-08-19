@@ -161,7 +161,8 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
         setState(() {
           numericDistance = doubleDistance;
           distance = distanceText;
-          driverTa = (numericDistance < 200) ? 300 : 400;
+          double earlyMorningFee = _isEarlyMorningTime(time) ? 300.0 : 0.0;
+          driverTa = ((numericDistance < 200) ? 300.0 : 400.0) + earlyMorningFee;
           tollCharge = numericDistance * 2.25;
           baseCharge = driverTa + tollCharge;
           belowFifty = false;
@@ -169,6 +170,33 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
       }
     } catch (e) {
       setState(() => numericDistance = 1);
+    }
+  }
+
+  bool _isEarlyMorningTime(String timeStr) {
+    if (timeStr.isEmpty) return false;
+    try {
+      final clean = timeStr.trim().toUpperCase();
+      int hour = -1;
+      int minute = 0;
+      if (clean.contains('AM') || clean.contains('PM')) {
+        final parts =
+            clean.replaceAll('AM', '').replaceAll('PM', '').trim().split(':');
+        hour = int.parse(parts[0]);
+        if (parts.length > 1) minute = int.parse(parts[1]);
+        if (clean.contains('AM')) {
+          if (hour == 12) hour = 0;
+        } else if (clean.contains('PM')) {
+          if (hour != 12) hour += 12;
+        }
+      } else {
+        final parts = clean.split(':');
+        hour = int.parse(parts[0]);
+        if (parts.length > 1) minute = int.parse(parts[1]);
+      }
+      return (hour >= 1 && hour < 6) || (hour == 6 && minute == 0);
+    } catch (_) {
+      return false;
     }
   }
 
