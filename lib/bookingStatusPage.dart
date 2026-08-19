@@ -137,8 +137,19 @@ class _BookingStatusPageState extends State<BookingStatusPage>
         upcoming.add(b);
       }
     }
-    upcoming.sort((a, b) => a['date'].compareTo(b['date']));
-    past.sort((a, b) => b['date'].compareTo(a['date']));
+    // Sort by ID descending so the newest booking always appears at the top (1st place)
+    upcoming.sort((a, b) {
+      int idA = int.tryParse(a['id']?.toString() ?? '0') ?? 0;
+      int idB = int.tryParse(b['id']?.toString() ?? '0') ?? 0;
+      if (idB != idA) return idB.compareTo(idA);
+      return (b['date'] ?? '').toString().compareTo((a['date'] ?? '').toString());
+    });
+    past.sort((a, b) {
+      int idA = int.tryParse(a['id']?.toString() ?? '0') ?? 0;
+      int idB = int.tryParse(b['id']?.toString() ?? '0') ?? 0;
+      if (idB != idA) return idB.compareTo(idA);
+      return (b['date'] ?? '').toString().compareTo((a['date'] ?? '').toString());
+    });
 
     setState(() {
       upcomingBookings = upcoming;
