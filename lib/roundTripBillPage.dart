@@ -579,7 +579,9 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
   Widget _buildAdvancePaymentBreakdownCard() {
     double dailyLimit = widget.kmPerDay;
     int days = _calculateDays();
-    double driverAllowance = widget.driverAllowance * days;
+    double dailyAllowanceRate = (widget.driverAllowance == 400 || widget.driverAllowance <= 0) ? 300.0 : widget.driverAllowance;
+    double driverAllowance = dailyAllowanceRate * days;
+    bool isEarlyMorning = _isEarlyMorningTime(widget.departureTime);
     double baseAdvance = dailyLimit * 4.0 * days; // ₹4 per KM advance
     double calculatedCommission = _calculateAgentCommission();
     double totalAdvancePayable = baseAdvance + calculatedCommission;
@@ -619,7 +621,15 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
           _buildBreakdownRow("Daily KM Limit", "${widget.kmPerDay.toStringAsFixed(0)} KM/day"),
           const Divider(height: 16),
           _buildBreakdownRow("Driver Allowance", "₹${driverAllowance.toStringAsFixed(0)}",
-              subtitle: "(₹${widget.driverAllowance.toStringAsFixed(0)}/day x $days Days)"),
+              subtitle: "(₹${dailyAllowanceRate.toStringAsFixed(0)}/day x $days Days)"),
+          if (isEarlyMorning) ...[
+            const Divider(height: 16),
+            _buildBreakdownRow(
+              "Early Morning Allowance",
+              "+₹300",
+              subtitle: "(You picked ${widget.departureTime} — ₹300 additional allowance)",
+            ),
+          ],
           const Divider(height: 16),
           _buildBreakdownRow("Advance Collected Online", "₹${baseAdvance.toStringAsFixed(0)}",
               subtitle: "(₹4.0/KM x ${dailyLimit.toStringAsFixed(0)} KM/day x $days Days)"),
@@ -751,5 +761,32 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
         ),
       ],
     );
+  }
+
+  bool _isEarlyMorningTime(String timeStr) {
+    if (timeStr.isEmpty) return false;
+    try {
+      final clean = timeStr.trim().toUpperCase();
+      int hour = -1;
+      int minute = 0;
+      if (clean.contains('AM') || clean.contains('PM')) {
+        final parts =
+            clean.replaceAll('AM', '').replaceAll('PM', '').trim().split(':');
+        hour = int.parse(parts[0]);
+        if (parts.length > 1) minute = int.parse(parts[1]);
+        if (clean.contains('AM')) {
+          if (hour == 12) hour = 0;
+        } else if (clean.contains('PM')) {
+          if (hour != 12) hour += 12;
+        }
+      } else {
+        final parts = clean.split(':');
+        hour = int.parse(parts[0]);
+        if (parts.length > 1) minute = int.parse(parts[1]);
+      }
+      return (hour >= 1 && hour < 6) || (hour == 6 && minute == 0);
+    } catch (_) {
+      return false;
+    }
   }
 }
