@@ -74,6 +74,15 @@ class _BookingStatusPageState extends State<BookingStatusPage>
     }
   }
 
+  Future<void> _refreshData() async {
+    if (phoneNumber != null) {
+      await fetchBookings(phoneNumber!);
+      await fetchDiscountFromLocalStorage(phoneNumber!);
+    } else {
+      await _loadPhoneNumber();
+    }
+  }
+
   Future<void> fetchBookings(String phone_number) async {
     try {
       final response = await http.get(
@@ -685,6 +694,24 @@ class _BookingStatusPageState extends State<BookingStatusPage>
               context, MaterialPageRoute(builder: (context) => BottomNavBar())),
         ),
         actions: [
+          // Refresh Button
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
+            tooltip: 'Refresh Trips',
+            onPressed: () async {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    "Refreshing trips...",
+                    style: GoogleFonts.poppins(fontSize: 12),
+                  ),
+                  duration: const Duration(seconds: 1),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              await _refreshData();
+            },
+          ),
           // Filter by Date
           IconButton(
             icon: Icon(
@@ -779,16 +806,28 @@ class _BookingStatusPageState extends State<BookingStatusPage>
 
   Widget _buildTripList(List<dynamic> bookings, bool isPast) {
     if (bookings.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      return RefreshIndicator(
+        onRefresh: _refreshData,
+        color: Colors.amber[800],
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           children: [
-            Icon(Icons.directions_car_filled_outlined,
-                size: 100, color: Colors.amber.withOpacity(0.1)),
-            const SizedBox(height: 16),
-            Text("No trips scheduled yet",
-                style:
-                    GoogleFonts.poppins(color: Colors.grey[400], fontSize: 16)),
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.6,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.directions_car_filled_outlined,
+                        size: 100, color: Colors.amber.withOpacity(0.1)),
+                    const SizedBox(height: 16),
+                    Text("No trips scheduled yet",
+                        style:
+                            GoogleFonts.poppins(color: Colors.grey[400], fontSize: 16)),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -797,72 +836,89 @@ class _BookingStatusPageState extends State<BookingStatusPage>
     final filteredBookings = _getFilteredBookings(bookings);
 
     if (filteredBookings.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.filter_list_off_rounded,
-                    size: 36, color: Colors.grey[400]),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                "No matching trips found",
-                style: GoogleFonts.poppins(
-                    color: const Color(0xFF1C1F26),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                "Try resetting your filter to view other bookings.",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                    color: Colors.grey[500], fontSize: 13),
-              ),
-              const SizedBox(height: 18),
-              ElevatedButton.icon(
-                onPressed: _resetFilters,
-                icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
-                label: Text(
-                  "Reset Filters",
-                  style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1C1F26),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+      return RefreshIndicator(
+        onRefresh: _refreshData,
+        color: Colors.amber[800],
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.6,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.filter_list_off_rounded,
+                            size: 36, color: Colors.grey[400]),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "No matching trips found",
+                        style: GoogleFonts.poppins(
+                            color: const Color(0xFF1C1F26),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        "Try resetting your filter to view other bookings.",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                            color: Colors.grey[500], fontSize: 13),
+                      ),
+                      const SizedBox(height: 18),
+                      ElevatedButton.icon(
+                        onPressed: _resetFilters,
+                        icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
+                        label: Text(
+                          "Reset Filters",
+                          style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1C1F26),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          elevation: 0,
+                        ),
+                      ),
+                    ],
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  elevation: 0,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: filteredBookings.length,
-      itemBuilder: (context, index) {
-        final booking = filteredBookings[index];
-        return FutureBuilder<Map<String, dynamic>?>(
-          future: fetchDriverDetails(booking['driver_id']?.toString() ?? ''),
-          builder: (context, snapshot) =>
-              _buildProfessionalCard(context, booking, snapshot.data, isPast),
-        );
-      },
+    return RefreshIndicator(
+      onRefresh: _refreshData,
+      color: Colors.amber[800],
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        itemCount: filteredBookings.length,
+        itemBuilder: (context, index) {
+          final booking = filteredBookings[index];
+          return FutureBuilder<Map<String, dynamic>?>(
+            future: fetchDriverDetails(booking['driver_id']?.toString() ?? ''),
+            builder: (context, snapshot) =>
+                _buildProfessionalCard(context, booking, snapshot.data, isPast),
+          );
+        },
+      ),
     );
   }
 
