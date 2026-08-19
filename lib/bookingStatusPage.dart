@@ -48,6 +48,150 @@ class _BookingStatusPageState extends State<BookingStatusPage>
     });
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadPhoneNumber();
+    _timer = Timer.periodic(const Duration(seconds: 15), (timer) {
+      if (phoneNumber != null) fetchBookings(phoneNumber!);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPhoneNumber() async {
+    String? savedNumber = await secureStorage.read(key: 'phone_number');
+    if (savedNumber != null) {
+      setState(() => phoneNumber = savedNumber);
+      fetchBookings(savedNumber);
+      fetchDiscountFromLocalStorage(savedNumber);
+    }
+  }
+
+  Future<void> fetchBookings(String phone_number) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            '${ApiConfig.baseUrl}/bookingStatus.php?phone_number=$phone_number'),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+        if (jsonResponse["status"] == "success") {
+          _separateAndSortBookings(jsonResponse["data"]);
+          setState(() {
+            isLoading = false;
+            hasError = false;
+          });
+        }
+      }
+    } catch (e) {
+      setState(() {
+        hasError = true;
+        isLoading = false;
+      });
+    }
+  }
+
+  void _separateAndSortBookings(List<dynamic> data) {
+    DateTime now = DateTime.now();
+    DateTime today = DateTime(now.year, now.month, now.day);
+    List<dynamic> upcoming = [];
+    List<dynamic> past = [];
+
+    for (var b in data) {
+      if (b['booking_status'] == 'Deleted') continue;
+      
+      // Parse date safely as local date to prevent timezone shifts (e.g. UTC-offset device showing today's trips in Past tab)
+      DateTime bDate;
+      try {
+        List<String> dateParts = b['date'].toString().split('-');
+        if (dateParts.length == 3) {
+          bDate = DateTime(
+            int.parse(dateParts[0]),
+            int.parse(dateParts[1]),
+            int.parse(dateParts[2]),
+          );
+        } else {
+          bDate = DateTime.parse(b['date'].toString()).toLocal();
+        }
+      } catch (_) {
+        bDate = DateTime.now();
+      }
+
+      if (b['booking_status'] == 'Completed' ||
+          b['booking_status'] == 'Cancelled' ||
+          b['booking_status'] == 'Customer Cancelled' ||
+          b['booking_status'] == 'Cancellation Requested' ||
+          b['booking_status'] == 'Declined' ||
+          b['booking_status'] == 'Failed' ||
+          bDate.isBefore(today)) {
+        past.add(b);
+      } else {
+        upcoming.add(b);
+      }
+    }
+    upcoming.sort((a, b) => a['date'].compareTo(b['date']));
+    past.sort((a, b) => b['date'].compareTo(a['date']));
+
+    setState(() {
+      upcomingBookings = upcoming;
+      pastBookings = past;
+    });
+  }
+
+  Future<void> fetchDiscountFromLocalStorage(String phone) async {
+    try {
+      final response = await http.get(Uri.parse(
+          '${ApiConfig.baseUrl}/5trips_trackor.php?booker_id=$phone'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          bookingDiscounts.clear();
+          for (var b in data['bookings']) {
+            bookingDiscounts[b['id']] = (b['discount_percent'] ?? 0).toInt();
+          }
+          setState(() {});
+        }
+      }
+    } catch (e) {}
+  }
+
+  Future<Map<String, dynamic>?> fetchDriverDetails(String driverId) async {
+    try {
+      final response = await http.get(Uri.parse(
+          '${ApiConfig.baseUrl}/driverDetails.php?driver_id=$driverId'));
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        return json["status"] == "success" ? json["data"] : null;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  Future<String> _getDriverAddress(double lat, double lng) async {
+    const String apiKey = "AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM";
+    final url =
+        "https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$apiKey";
+    try {
+      final response = await http.get(Uri.parse(url));
+      final data = json.decode(response.body);
+      if (data['status'] == 'OK' && data['results'] != null && data['results'].isNotEmpty) {
+        final result = data['results'][0];
+        return result['formatted_address'] ?? "Unknown Location";
+      }
+    } catch (e) {
+      debugPrint("Reverse geocoding error: $e");
+    }
+    return "Location not available";
+  }
+
   List<dynamic> _getFilteredBookings(List<dynamic> list) {
     return list.where((b) {
       // 1. Trip Type Filter
@@ -150,7 +294,7 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                   
                   // Header Row
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.between,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         'Filter Trips',
