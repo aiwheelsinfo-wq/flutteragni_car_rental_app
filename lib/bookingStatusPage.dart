@@ -32,148 +32,482 @@ class _BookingStatusPageState extends State<BookingStatusPage>
   Timer? _timer;
   late TabController _tabController;
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadPhoneNumber();
-    _timer = Timer.periodic(const Duration(seconds: 15), (timer) {
-      if (phoneNumber != null) fetchBookings(phoneNumber!);
-    });
-  }
+  // Filter State
+  String selectedTripType = 'All';
+  String selectedStatus = 'All';
+  DateTime? selectedDate;
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _tabController.dispose();
-    super.dispose();
-  }
+  bool get isFilterActive =>
+      selectedTripType != 'All' || selectedStatus != 'All' || selectedDate != null;
 
-  Future<void> _loadPhoneNumber() async {
-    String? savedNumber = await secureStorage.read(key: 'phone_number');
-    if (savedNumber != null) {
-      setState(() => phoneNumber = savedNumber);
-      fetchBookings(savedNumber);
-      fetchDiscountFromLocalStorage(savedNumber);
-    }
-  }
-
-  Future<void> fetchBookings(String phone_number) async {
-    try {
-      final response = await http.get(
-        Uri.parse(
-            '${ApiConfig.baseUrl}/bookingStatus.php?phone_number=$phone_number'),
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-        if (jsonResponse["status"] == "success") {
-          _separateAndSortBookings(jsonResponse["data"]);
-          setState(() {
-            isLoading = false;
-            hasError = false;
-          });
-        }
-      }
-    } catch (e) {
-      setState(() {
-        hasError = true;
-        isLoading = false;
-      });
-    }
-  }
-
-  void _separateAndSortBookings(List<dynamic> data) {
-    DateTime now = DateTime.now();
-    DateTime today = DateTime(now.year, now.month, now.day);
-    List<dynamic> upcoming = [];
-    List<dynamic> past = [];
-
-    for (var b in data) {
-      if (b['booking_status'] == 'Deleted') continue;
-      
-      // Parse date safely as local date to prevent timezone shifts (e.g. UTC-offset device showing today's trips in Past tab)
-      DateTime bDate;
-      try {
-        List<String> dateParts = b['date'].toString().split('-');
-        if (dateParts.length == 3) {
-          bDate = DateTime(
-            int.parse(dateParts[0]),
-            int.parse(dateParts[1]),
-            int.parse(dateParts[2]),
-          );
-        } else {
-          bDate = DateTime.parse(b['date'].toString()).toLocal();
-        }
-      } catch (_) {
-        bDate = DateTime.now();
-      }
-
-      if (b['booking_status'] == 'Completed' ||
-          b['booking_status'] == 'Cancelled' ||
-          b['booking_status'] == 'Customer Cancelled' ||
-          b['booking_status'] == 'Cancellation Requested' ||
-          b['booking_status'] == 'Declined' ||
-          b['booking_status'] == 'Failed' ||
-          bDate.isBefore(today)) {
-        past.add(b);
-      } else {
-        upcoming.add(b);
-      }
-    }
-    upcoming.sort((a, b) => a['date'].compareTo(b['date']));
-    past.sort((a, b) => b['date'].compareTo(a['date']));
-
+  void _resetFilters() {
     setState(() {
-      upcomingBookings = upcoming;
-      pastBookings = past;
+      selectedTripType = 'All';
+      selectedStatus = 'All';
+      selectedDate = null;
     });
   }
 
-  Future<void> fetchDiscountFromLocalStorage(String phone) async {
-    try {
-      final response = await http.get(Uri.parse(
-          '${ApiConfig.baseUrl}/5trips_trackor.php?booker_id=$phone'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          bookingDiscounts.clear();
-          for (var b in data['bookings']) {
-            bookingDiscounts[b['id']] = (b['discount_percent'] ?? 0).toInt();
+  List<dynamic> _getFilteredBookings(List<dynamic> list) {
+    return list.where((b) {
+      // 1. Trip Type Filter
+      if (selectedTripType != 'All') {
+        String type = (b['trip_type'] ?? '').toString().toLowerCase();
+        if (!type.contains(selectedTripType.toLowerCase())) return false;
+      }
+
+      // 2. Status Filter
+      if (selectedStatus != 'All') {
+        String s = (b['booking_status'] ?? '').toString().toLowerCase();
+        if (selectedStatus == 'Pending') {
+          if (s.contains('cancel') ||
+              s.contains('fail') ||
+              s.contains('complet') ||
+              s.contains('start') ||
+              s.contains('accept') ||
+              s.contains('assign')) {
+            return false;
           }
-          setState(() {});
+        } else if (selectedStatus == 'Active / Started') {
+          if (!s.contains('start') &&
+              !s.contains('accept') &&
+              !s.contains('assign') &&
+              !s.contains('confirm')) {
+            return false;
+          }
+        } else if (selectedStatus == 'Completed') {
+          if (!s.contains('complet')) return false;
+        } else if (selectedStatus == 'Cancelled') {
+          if (!s.contains('cancel') &&
+              !s.contains('fail') &&
+              !s.contains('declin')) {
+            return false;
+          }
         }
       }
-    } catch (e) {}
+
+      // 3. Date Filter
+      if (selectedDate != null) {
+        String filterDateStr = DateFormat('yyyy-MM-dd').format(selectedDate!);
+        String tripDate = (b['date'] ?? '').toString();
+        if (tripDate != filterDateStr) return false;
+      }
+
+      return true;
+    }).toList();
   }
 
-  Future<Map<String, dynamic>?> fetchDriverDetails(String driverId) async {
-    try {
-      final response = await http.get(Uri.parse(
-          '${ApiConfig.baseUrl}/driverDetails.php?driver_id=$driverId'));
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return json["status"] == "success" ? json["data"] : null;
-      }
-    } catch (e) {}
-    return null;
+  void _openFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final tripTypes = [
+              'All',
+              'One-Way',
+              'Round-Trip',
+              'Local-Taxi',
+              'Local-Duty'
+            ];
+            final statuses = [
+              'All',
+              'Pending',
+              'Active / Started',
+              'Completed',
+              'Cancelled'
+            ];
+
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle indicator
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Header Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.between,
+                    children: [
+                      Text(
+                        'Filter Trips',
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1C1F26),
+                        ),
+                      ),
+                      if (isFilterActive)
+                        TextButton(
+                          onPressed: () {
+                            setModalState(() {
+                              selectedTripType = 'All';
+                              selectedStatus = 'All';
+                              selectedDate = null;
+                            });
+                            _resetFilters();
+                          },
+                          child: Text(
+                            'Reset',
+                            style: GoogleFonts.poppins(
+                              color: Colors.redAccent,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+
+                  // Section: Trip Type
+                  Text(
+                    'TRIP TYPE',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey[500],
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: tripTypes.map((type) {
+                      final isSelected = selectedTripType == type;
+                      return ChoiceChip(
+                        label: Text(type),
+                        selected: isSelected,
+                        onSelected: (val) {
+                          setModalState(() => selectedTripType = type);
+                          setState(() => selectedTripType = type);
+                        },
+                        selectedColor: const Color(0xFF1C1F26),
+                        backgroundColor: const Color(0xFFF3F4F6),
+                        labelStyle: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? Colors.white : const Color(0xFF4B5563),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: isSelected ? const Color(0xFF1C1F26) : const Color(0xFFE5E7EB),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Section: Status
+                  Text(
+                    'STATUS',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey[500],
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: statuses.map((status) {
+                      final isSelected = selectedStatus == status;
+                      return ChoiceChip(
+                        label: Text(status),
+                        selected: isSelected,
+                        onSelected: (val) {
+                          setModalState(() => selectedStatus = status);
+                          setState(() => selectedStatus = status);
+                        },
+                        selectedColor: const Color(0xFF1C1F26),
+                        backgroundColor: const Color(0xFFF3F4F6),
+                        labelStyle: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? Colors.white : const Color(0xFF4B5563),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: isSelected ? const Color(0xFF1C1F26) : const Color(0xFFE5E7EB),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Section: Travel Date
+                  Text(
+                    'TRAVEL DATE',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey[500],
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: () async {
+                      DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate ?? DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: ColorScheme.light(
+                                primary: Colors.yellow[700]!,
+                                onPrimary: Colors.white,
+                                onSurface: const Color(0xFF1C1F26),
+                              ),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      );
+                      if (picked != null) {
+                        setModalState(() => selectedDate = picked);
+                        setState(() => selectedDate = picked);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F9FD),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.calendar_today_rounded,
+                                  size: 16, color: Colors.yellow[800]),
+                              const SizedBox(width: 10),
+                              Text(
+                                selectedDate != null
+                                    ? DateFormat('dd MMMM yyyy').format(selectedDate!)
+                                    : 'Select Travel Date',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  fontWeight: selectedDate != null ? FontWeight.w600 : FontWeight.w400,
+                                  color: selectedDate != null
+                                      ? const Color(0xFF1C1F26)
+                                      : Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (selectedDate != null)
+                            GestureDetector(
+                              onTap: () {
+                                setModalState(() => selectedDate = null);
+                                setState(() => selectedDate = null);
+                              },
+                              child: const Icon(Icons.close_rounded, size: 18, color: Colors.grey),
+                            )
+                          else
+                            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Apply Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1C1F26),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        'Apply Filters',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
-  Future<String> _getDriverAddress(double lat, double lng) async {
-    const String apiKey = "AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM";
-    final url =
-        "https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$apiKey";
-    try {
-      final response = await http.get(Uri.parse(url));
-      final data = json.decode(response.body);
-      if (data['status'] == 'OK' && data['results'] != null && data['results'].isNotEmpty) {
-        final result = data['results'][0];
-        return result['formatted_address'] ?? "Unknown Location";
-      }
-    } catch (e) {
-      debugPrint("Reverse geocoding error: $e");
-    }
-    return "Location not available";
+  Widget _buildHorizontalFilterBar() {
+    final tripTypes = ['All', 'One-Way', 'Round-Trip', 'Local-Taxi', 'Local-Duty'];
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                ...tripTypes.map((type) {
+                  final bool isSelected = selectedTripType == type;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          selectedTripType = type;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFF1C1F26) : const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFF1C1F26) : const Color(0xFFE5E7EB),
+                          ),
+                        ),
+                        child: Text(
+                          type,
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected ? Colors.white : const Color(0xFF4B5563),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          if (isFilterActive) ...[
+            const SizedBox(height: 6),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  if (selectedDate != null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.amber.shade300),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.calendar_today_rounded, size: 12, color: Colors.amber[800]),
+                          const SizedBox(width: 4),
+                          Text(
+                            DateFormat('dd MMM yyyy').format(selectedDate!),
+                            style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.amber.shade900),
+                          ),
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () => setState(() => selectedDate = null),
+                            child: Icon(Icons.close_rounded, size: 14, color: Colors.amber[800]),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (selectedStatus != 'All') ...[
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.blue.shade300),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "Status: $selectedStatus",
+                            style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blue.shade900),
+                          ),
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () => setState(() => selectedStatus = 'All'),
+                            child: Icon(Icons.close_rounded, size: 14, color: Colors.blue[800]),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  GestureDetector(
+                    onTap: _resetFilters,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      child: Text(
+                        "Clear All",
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.redAccent,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -195,6 +529,65 @@ class _BookingStatusPageState extends State<BookingStatusPage>
           onPressed: () => Navigator.pushReplacement(
               context, MaterialPageRoute(builder: (context) => BottomNavBar())),
         ),
+        actions: [
+          // Filter by Date
+          IconButton(
+            icon: Icon(
+              selectedDate != null ? Icons.event_available : Icons.calendar_month_outlined,
+              color: Colors.white,
+              size: 22,
+            ),
+            tooltip: 'Filter by Date',
+            onPressed: () async {
+              DateTime? picked = await showDatePicker(
+                context: context,
+                initialDate: selectedDate ?? DateTime.now(),
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2030),
+                builder: (context, child) {
+                  return Theme(
+                    data: Theme.of(context).copyWith(
+                      colorScheme: ColorScheme.light(
+                        primary: Colors.yellow[700]!,
+                        onPrimary: Colors.white,
+                        onSurface: const Color(0xFF1C1F26),
+                      ),
+                    ),
+                    child: child!,
+                  );
+                },
+              );
+              if (picked != null) {
+                setState(() => selectedDate = picked);
+              }
+            },
+          ),
+          // Filter Bottom Sheet Button with Badge
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.tune_rounded, color: Colors.white, size: 22),
+                tooltip: 'Filter Options',
+                onPressed: _openFilterBottomSheet,
+              ),
+              if (isFilterActive)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF1C1F26),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 4),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -212,11 +605,18 @@ class _BookingStatusPageState extends State<BookingStatusPage>
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
-          : TabBarView(
-              controller: _tabController,
+          : Column(
               children: [
-                _buildTripList(upcomingBookings, false),
-                _buildTripList(pastBookings, true),
+                _buildHorizontalFilterBar(),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildTripList(upcomingBookings, false),
+                      _buildTripList(pastBookings, true),
+                    ],
+                  ),
+                ),
               ],
             ),
     );
@@ -238,11 +638,70 @@ class _BookingStatusPageState extends State<BookingStatusPage>
         ),
       );
     }
+
+    final filteredBookings = _getFilteredBookings(bookings);
+
+    if (filteredBookings.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.filter_list_off_rounded,
+                    size: 36, color: Colors.grey[400]),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "No matching trips found",
+                style: GoogleFonts.poppins(
+                    color: const Color(0xFF1C1F26),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                "Try resetting your filter to view other bookings.",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                    color: Colors.grey[500], fontSize: 13),
+              ),
+              const SizedBox(height: 18),
+              ElevatedButton.icon(
+                onPressed: _resetFilters,
+                icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
+                label: Text(
+                  "Reset Filters",
+                  style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1C1F26),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: bookings.length,
+      itemCount: filteredBookings.length,
       itemBuilder: (context, index) {
-        final booking = bookings[index];
+        final booking = filteredBookings[index];
         return FutureBuilder<Map<String, dynamic>?>(
           future: fetchDriverDetails(booking['driver_id']?.toString() ?? ''),
           builder: (context, snapshot) =>
