@@ -27,11 +27,10 @@ class Car {
       price: double.tryParse(json['kmRate'].toString()) ?? 0.0,
       gstPercent: double.tryParse(json['gstPercent'].toString()) ?? 0.0,
       driverAllowance:
-          (double.tryParse(json['driverAllowance'].toString()) == 400.0 ||
-                  double.tryParse(json['driverAllowance'].toString()) == null ||
+          (double.tryParse(json['driverAllowance'].toString()) == null ||
                   double.tryParse(json['driverAllowance'].toString()) == 0.0)
-              ? 300.0
-              : (double.tryParse(json['driverAllowance'].toString()) ?? 300.0),
+              ? 400.0
+              : (double.tryParse(json['driverAllowance'].toString()) ?? 400.0),
       kmPerDay: double.tryParse(json['kmPerDay'].toString()) ?? 0.0,
     );
   }
