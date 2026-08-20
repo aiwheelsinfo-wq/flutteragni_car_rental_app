@@ -69,6 +69,66 @@ class _InvoicePageState extends State<InvoicePage> {
     'paid_amount': '0',
   };
 
+  bool get _isAgentInvoice {
+    if (userType == 'agent') return true;
+    if (invoiceData['agent_accountType'] == 'agent') return true;
+    final bName = invoiceData['business_name'];
+    if (bName != null && bName != 'Not Generated' && bName.trim().isNotEmpty) {
+      return true;
+    }
+    return false;
+  }
+
+  String get _agentHeaderName {
+    final bName = invoiceData['business_name'];
+    if (bName != null && bName != 'Not Generated' && bName.trim().isNotEmpty) {
+      return bName;
+    }
+    final aName = invoiceData['agent_agency_name'];
+    if (aName != null && aName != 'Not Filled' && aName.trim().isNotEmpty) {
+      return aName;
+    }
+    final agName = invoiceData['agent_name'];
+    if (agName != null && agName != 'Not Filled' && agName.trim().isNotEmpty) {
+      return agName;
+    }
+    return 'AGENT CAR RENTAL';
+  }
+
+  String get _agentHeaderAddress {
+    final bAddr = invoiceData['business_address'];
+    if (bAddr != null && bAddr != 'Not Generated' && bAddr.trim().isNotEmpty) {
+      return bAddr;
+    }
+    final aCity = invoiceData['agent_city'];
+    if (aCity != null && aCity != 'Not Filled' && aCity.trim().isNotEmpty) {
+      return aCity;
+    }
+    return '';
+  }
+
+  String get _agentHeaderContact {
+    String contact = '';
+    final phone = invoiceData['agent_phone'];
+    if (phone != null && phone.isNotEmpty && phone != 'Not Filled') {
+      contact += "Tel: $phone";
+    }
+    final email = invoiceData['agent_email'];
+    if (email != null && email.isNotEmpty && email != 'Not Filled') {
+      if (contact.isNotEmpty) contact += " | ";
+      contact += "Email: $email";
+    }
+    return contact;
+  }
+
+  String get _agentHeaderGst {
+    final gst = invoiceData['gst_number'];
+    if (gst != null && gst != 'Not Generated' && gst.trim().isNotEmpty) {
+      return gst;
+    }
+    return '';
+  }
+
   @override
   void initState() {
     super.initState();
