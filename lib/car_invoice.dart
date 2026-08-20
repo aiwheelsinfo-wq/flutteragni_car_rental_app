@@ -144,6 +144,14 @@ class _InvoicePageState extends State<InvoicePage> {
                 (data['base_charge'] ?? '0').toString();
             invoiceData['paid_amount'] =
                 (data['paid_amount'] ?? '0').toString();
+            invoiceData['agent_agency_name'] =
+                data['agent_agency_name'] ?? data['agency_name'] ?? '';
+            invoiceData['agent_name'] = data['agent_name'] ?? '';
+            invoiceData['agent_email'] = data['agent_email'] ?? '';
+            invoiceData['agent_city'] = data['agent_city'] ?? '';
+            invoiceData['agent_phone'] = data['agent_phone'] ?? '';
+            invoiceData['agent_accountType'] =
+                data['agent_accountType'] ?? data['accountType'] ?? '';
             invoiceData['booked_start_date'] =
                 (data['date'] ?? '0000-00-00').toString();
             invoiceData['booked_return_date'] =
@@ -390,15 +398,30 @@ class _InvoicePageState extends State<InvoicePage> {
                     style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 8),
-              pw.Text("RENTOX CAR ",
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-              pw.Text(
-                  "7, Jalaram Niwas, Ganesh Gawde Road, \nMulund (W), Mumbai - 400080",
-                  style: const pw.TextStyle(fontSize: 12)),
-              pw.Text(
-                  "Tel: 9619936999 | Email: agnicarrental@gmail.com \nWebsite: www.agnicarrental.com",
-                  style: const pw.TextStyle(fontSize: 12)),
-              pw.Text("GST No: 27AABPG5706A3ZB", style: const pw.TextStyle(fontSize: 12)),
+              if (_isAgentInvoice) ...[
+                pw.Text(_agentHeaderName,
+                    style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                if (_agentHeaderAddress.isNotEmpty)
+                  pw.Text(_agentHeaderAddress,
+                      style: const pw.TextStyle(fontSize: 12)),
+                if (_agentHeaderContact.isNotEmpty)
+                  pw.Text(_agentHeaderContact,
+                      style: const pw.TextStyle(fontSize: 12)),
+                if (_agentHeaderGst.isNotEmpty)
+                  pw.Text("GST No: $_agentHeaderGst",
+                      style: const pw.TextStyle(fontSize: 12)),
+              ] else ...[
+                pw.Text("RENTOX CAR ",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                pw.Text(
+                    "7, Jalaram Niwas, Ganesh Gawde Road, \nMulund (W), Mumbai - 400080",
+                    style: const pw.TextStyle(fontSize: 12)),
+                pw.Text(
+                    "Tel: 9619936999 | Email: agnicarrental@gmail.com \nWebsite: www.agnicarrental.com",
+                    style: const pw.TextStyle(fontSize: 12)),
+                pw.Text("GST No: 27AABPG5706A3ZB", style: const pw.TextStyle(fontSize: 12)),
+              ],
               pw.SizedBox(height: 8),
               pw.Align(
                 alignment: pw.Alignment.centerRight,
@@ -415,7 +438,7 @@ class _InvoicePageState extends State<InvoicePage> {
                   pw.Expanded(child: pw.Text("${invoiceData['invoiceNumber']}", style: const pw.TextStyle(fontSize: 12))),
                 ],
               ),
-              if (invoiceData['gst_number'] != 'Not Generated' &&
+              if (!_isAgentInvoice && invoiceData['gst_number'] != 'Not Generated' &&
                   invoiceData['gst_number'] != '') ...[
                 pw.Row(
                   children: [
@@ -571,19 +594,23 @@ class _InvoicePageState extends State<InvoicePage> {
                 pw.Text("Agent Commission is included in the above amount",
                     style: const pw.TextStyle(fontSize: 10)),
               ],
-              pw.SizedBox(height: 12),
-              pw.Text("Bank Details:",
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-              pw.Text("Federal Bank", style: const pw.TextStyle(fontSize: 12)),
-              pw.Text("RENTOX CAR ", style: const pw.TextStyle(fontSize: 12)),
-              pw.Text("A/c No.: 15390200008421", style: const pw.TextStyle(fontSize: 12)),
-              pw.Text("IFSC CODE: FDRL0001539", style: const pw.TextStyle(fontSize: 12)),
+              if (!_isAgentInvoice) ...[
+                pw.SizedBox(height: 12),
+                pw.Text("Bank Details:",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                pw.Text("Federal Bank", style: const pw.TextStyle(fontSize: 12)),
+                pw.Text("RENTOX CAR ", style: const pw.TextStyle(fontSize: 12)),
+                pw.Text("A/c No.: 15390200008421", style: const pw.TextStyle(fontSize: 12)),
+                pw.Text("IFSC CODE: FDRL0001539", style: const pw.TextStyle(fontSize: 12)),
+              ],
               pw.SizedBox(height: 20),
               pw.Text("Authorized Sign.", style: const pw.TextStyle(fontSize: 12)),
-              pw.SizedBox(height: 8),
-              pw.Text(
-                  "Kindly issue a crossed cheque in favour of AGNI CAR RENTAL \"Subject To Mumbai Jurisdiction\"",
-                  style: const pw.TextStyle(fontSize: 10)),
+              if (!_isAgentInvoice) ...[
+                pw.SizedBox(height: 8),
+                pw.Text(
+                    "Kindly issue a crossed cheque in favour of AGNI CAR RENTAL \"Subject To Mumbai Jurisdiction\"",
+                    style: const pw.TextStyle(fontSize: 10)),
+              ],
             ],
           );
         },
@@ -711,15 +738,26 @@ class _InvoicePageState extends State<InvoicePage> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         ),
         SizedBox(height: 8),
-        Text("RENTOX CAR ",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        Text(
-            "7, Jalaram Niwas, Ganesh Gawde Road, \nMulund (W), Mumbai - 400080",
-            style: TextStyle(fontSize: 12)),
-        Text(
-            "Tel: 9619936999 | Email: agnicarrental@gmail.com \nWebsite: www.agnicarrental.com",
-            style: TextStyle(fontSize: 12)),
-        Text("GST No: 27AABPG5706A3ZB", style: TextStyle(fontSize: 12)),
+        if (_isAgentInvoice) ...[
+          Text(_agentHeaderName,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          if (_agentHeaderAddress.isNotEmpty)
+            Text(_agentHeaderAddress, style: TextStyle(fontSize: 12)),
+          if (_agentHeaderContact.isNotEmpty)
+            Text(_agentHeaderContact, style: TextStyle(fontSize: 12)),
+          if (_agentHeaderGst.isNotEmpty)
+            Text("GST No: $_agentHeaderGst", style: TextStyle(fontSize: 12)),
+        ] else ...[
+          Text("RENTOX CAR ",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(
+              "7, Jalaram Niwas, Ganesh Gawde Road, \nMulund (W), Mumbai - 400080",
+              style: TextStyle(fontSize: 12)),
+          Text(
+              "Tel: 9619936999 | Email: agnicarrental@gmail.com \nWebsite: www.agnicarrental.com",
+              style: TextStyle(fontSize: 12)),
+          Text("GST No: 27AABPG5706A3ZB", style: TextStyle(fontSize: 12)),
+        ],
         SizedBox(height: 8),
         Align(
           alignment: Alignment.centerRight,
@@ -728,7 +766,7 @@ class _InvoicePageState extends State<InvoicePage> {
         ),
         SizedBox(height: 8),
         _buildRow("Bill No:", "${invoiceData['invoiceNumber']}"),
-        if (invoiceData['gst_number'] != 'Not Generated' &&
+        if (!_isAgentInvoice && invoiceData['gst_number'] != 'Not Generated' &&
             invoiceData['gst_number'] != '') ...[
           _buildRow("Business Name:", invoiceData['business_name']!),
           _buildRow("Address:", invoiceData['business_address']!),
@@ -749,18 +787,23 @@ class _InvoicePageState extends State<InvoicePage> {
           Text("Agent Commission is inluded in the above amount",
               style: TextStyle(fontSize: 10)),
         ],
-        SizedBox(height: 12),
-        Text("Bank Details:",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        Text("Federal Bank", style: TextStyle(fontSize: 12)),
-        Text("RENTOX CAR ", style: TextStyle(fontSize: 12)),
-        Text("A/c No.: 15390200008421", style: TextStyle(fontSize: 12)),
-        Text("IFSC CODE: FDRL0001539", style: TextStyle(fontSize: 12)),
+        if (!_isAgentInvoice) ...[
+          SizedBox(height: 12),
+          Text("Bank Details:",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text("Federal Bank", style: TextStyle(fontSize: 12)),
+          Text("RENTOX CAR ", style: TextStyle(fontSize: 12)),
+          Text("A/c No.: 15390200008421", style: TextStyle(fontSize: 12)),
+          Text("IFSC CODE: FDRL0001539", style: TextStyle(fontSize: 12)),
+        ],
         SizedBox(height: 20),
         Text("Authorized Sign.", style: TextStyle(fontSize: 12)),
-        Text(
-            "Kindly issue a crossed cheque in favour of AGNI CAR RENTAL \"Subject To Mumbai Jurisdiction\"",
-            style: TextStyle(fontSize: 10)),
+        if (!_isAgentInvoice) ...[
+          SizedBox(height: 4),
+          Text(
+              "Kindly issue a crossed cheque in favour of AGNI CAR RENTAL \"Subject To Mumbai Jurisdiction\"",
+              style: TextStyle(fontSize: 10)),
+        ],
       ],
     );
   }
