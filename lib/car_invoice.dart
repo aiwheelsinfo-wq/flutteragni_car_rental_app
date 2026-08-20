@@ -7,7 +7,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:intl/intl.dart';
 import 'dart:math';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:agni_car_rental/config/api_config.dart';
@@ -15,7 +14,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class InvoicePage extends StatefulWidget {
-  String bookingId;
+  final String bookingId;
 
   InvoicePage({required this.bookingId});
 
@@ -306,9 +305,9 @@ class _InvoicePageState extends State<InvoicePage> {
                       : '₹$col3')
                   : '',
               style: pw.TextStyle(
-                fontWeight: (col1 == 'TOTAL' || isHeader)
+                fontWeight: (col1 == 'TOTAL' || isHeader || isTotal)
                     ? pw.FontWeight.bold
-                    : (isTotal ? pw.FontWeight.bold : pw.FontWeight.medium),
+                    : pw.FontWeight.normal,
                 fontSize: fontSize,
                 color: isHeader
                     ? PdfColors.white
@@ -329,10 +328,10 @@ class _InvoicePageState extends State<InvoicePage> {
 
     final totalKm = double.parse(invoiceData['closing_km']!) -
         double.parse(invoiceData['starting_km']!);
-    final startingDate = invoiceData['starting_date']; // e.g., "2025-04-26"
-    final startingTime = invoiceData['starting_time']; // e.g., "09:00:00"
-    final closingDate = invoiceData['closing_date']; // e.g., "2025-04-26"
-    final closingTime = invoiceData['closing_time']; // e.g., "17:30:00"
+    final startingDate = invoiceData['starting_date'];
+    final startingTime = invoiceData['starting_time'];
+    final closingDate = invoiceData['closing_date'];
+    final closingTime = invoiceData['closing_time'];
     final startDateTime =
         DateTime.tryParse('$startingDate $startingTime') ?? DateTime.now();
     var endDateTime =
@@ -380,7 +379,6 @@ class _InvoicePageState extends State<InvoicePage> {
     double? toll_charge =
         double.tryParse(invoiceData['toll_charge'].toString()) ?? 0.0;
     if (invoiceData['trip_type'] == 'Local-Duty') {
-      // Parse inputs safely
       final packageKm = double.tryParse(invoiceData['packageKm'] ?? '0') ?? 0;
       final packageHours =
           double.tryParse(invoiceData['packageHours'] ?? '0') ?? 0;
@@ -392,16 +390,13 @@ class _InvoicePageState extends State<InvoicePage> {
           double.tryParse(invoiceData['packageBaseFare'] ?? '0') ?? 0;
       double driverAllowance = 0.0;
 
-      // Extra km
       extraKm = totalKm > packageKm ? totalKm - packageKm : 0;
       extrakmAmount = extraKm * extraKmPrice;
 
-      // Extra hours
       if (minutes > 30) hours += 1;
       extraHours = hours > packageHours ? hours - packageHours : 0;
       extraHoursAmount = extraHours * extraHoursPrice;
 
-      // Special allowance: start before 5AM or end after 11:30PM
       bool isStartBefore5AM = startDateTime.hour < 5;
       bool isEndAfter1130PM = endDateTime.hour > 23 ||
           (endDateTime.hour == 23 && endDateTime.minute > 30);
@@ -410,11 +405,9 @@ class _InvoicePageState extends State<InvoicePage> {
             double.tryParse(invoiceData['driver_allowance'] ?? '0') ?? 0;
       }
 
-      // Total base before GST
       double totalBeforeGst =
           packageBaseFare + extrakmAmount + extraHoursAmount + agent_commission;
 
-      // GST and net total
       gst = totalBeforeGst * gstPercent / 100;
       netTotal = totalBeforeGst +
           gst +
@@ -423,7 +416,6 @@ class _InvoicePageState extends State<InvoicePage> {
           permit_charge +
           driverAllowance;
 
-      // Format all numbers to 2 decimal places
       baceAmount = double.parse(packageBaseFare.toStringAsFixed(2));
       packageBaseWithCommission =
           double.parse((packageBaseFare + agent_commission).toStringAsFixed(2));
@@ -515,7 +507,6 @@ class _InvoicePageState extends State<InvoicePage> {
 
       base_charge = baceAmount;
 
-      // Format all values to 2 decimal places
       baceAmount = double.parse(baceAmount.toStringAsFixed(2));
       totalbeforeGst = double.parse(totalbeforeGst.toStringAsFixed(2));
       gst = double.parse(gst.toStringAsFixed(2));
@@ -689,7 +680,6 @@ class _InvoicePageState extends State<InvoicePage> {
                               pw.Text("${invoiceData['invoieceDate']}",
                                   style: pw.TextStyle(
                                       fontSize: 9.5,
-                                      fontWeight: pw.FontWeight.medium,
                                       color: PdfColor.fromHex('#0F172A'))),
                             ],
                           ),
@@ -856,7 +846,6 @@ class _InvoicePageState extends State<InvoicePage> {
                         pw.Text(dateFormat.format(startDateTime),
                             style: pw.TextStyle(
                                 fontSize: 8.5,
-                                fontWeight: pw.FontWeight.medium,
                                 color: PdfColor.fromHex('#0F172A'))),
                       ],
                     ),
@@ -871,7 +860,6 @@ class _InvoicePageState extends State<InvoicePage> {
                         pw.Text(dateFormat.format(endDateTime),
                             style: pw.TextStyle(
                                 fontSize: 8.5,
-                                fontWeight: pw.FontWeight.medium,
                                 color: PdfColor.fromHex('#0F172A'))),
                       ],
                     ),
@@ -888,7 +876,6 @@ class _InvoicePageState extends State<InvoicePage> {
                           pw.Text(invoiceData['starting_km']!,
                               style: pw.TextStyle(
                                   fontSize: 8.5,
-                                  fontWeight: pw.FontWeight.medium,
                                   color: PdfColor.fromHex('#0F172A'))),
                         ],
                       ),
@@ -903,7 +890,6 @@ class _InvoicePageState extends State<InvoicePage> {
                           pw.Text(invoiceData['closing_km']!,
                               style: pw.TextStyle(
                                   fontSize: 8.5,
-                                  fontWeight: pw.FontWeight.medium,
                                   color: PdfColor.fromHex('#0F172A'))),
                         ],
                       ),
@@ -1032,7 +1018,7 @@ class _InvoicePageState extends State<InvoicePage> {
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  // Left side info (Agent commission note or Bank Details)
+                  // Left side info
                   pw.Expanded(
                     flex: 5,
                     child: pw.Column(
@@ -1052,7 +1038,6 @@ class _InvoicePageState extends State<InvoicePage> {
                               "Agent Commission is included in the above amount",
                               style: pw.TextStyle(
                                   fontSize: 8,
-                                  fontWeight: pw.FontWeight.medium,
                                   color: PdfColor.fromHex('#1E3A8A')),
                             ),
                           ),
@@ -1202,7 +1187,6 @@ class _InvoicePageState extends State<InvoicePage> {
                           "Thank you for choosing $_agentHeaderName",
                           style: pw.TextStyle(
                               fontSize: 8,
-                              fontWeight: pw.FontWeight.medium,
                               color: PdfColor.fromHex('#1E3A8A')),
                         ),
                       ],
@@ -1578,10 +1562,10 @@ class _InvoicePageState extends State<InvoicePage> {
     final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
     final totalKm = double.parse(invoiceData['closing_km']!) -
         double.parse(invoiceData['starting_km']!);
-    final startingDate = invoiceData['starting_date']; // e.g., "2025-04-26"
-    final startingTime = invoiceData['starting_time']; // e.g., "09:00:00"
-    final closingDate = invoiceData['closing_date']; // e.g., "2025-04-26"
-    final closingTime = invoiceData['closing_time']; // e.g., "17:30:00"
+    final startingDate = invoiceData['starting_date'];
+    final startingTime = invoiceData['starting_time'];
+    final closingDate = invoiceData['closing_date'];
+    final closingTime = invoiceData['closing_time'];
     final startDateTime =
         DateTime.tryParse('$startingDate $startingTime') ?? DateTime.now();
     var endDateTime =
@@ -1629,7 +1613,6 @@ class _InvoicePageState extends State<InvoicePage> {
     double? toll_charge =
         double.tryParse(invoiceData['toll_charge'].toString()) ?? 0.0;
     if (invoiceData['trip_type'] == 'Local-Duty') {
-      // Parse inputs safely
       final packageKm = double.tryParse(invoiceData['packageKm'] ?? '0') ?? 0;
       final packageHours =
           double.tryParse(invoiceData['packageHours'] ?? '0') ?? 0;
@@ -1641,16 +1624,13 @@ class _InvoicePageState extends State<InvoicePage> {
           double.tryParse(invoiceData['packageBaseFare'] ?? '0') ?? 0;
       double driverAllowance = 0.0;
 
-      // Extra km
       extraKm = totalKm > packageKm ? totalKm - packageKm : 0;
       extrakmAmount = extraKm * extraKmPrice;
 
-      // Extra hours
       if (minutes > 30) hours += 1;
       extraHours = hours > packageHours ? hours - packageHours : 0;
       extraHoursAmount = extraHours * extraHoursPrice;
 
-      // Special allowance: start before 5AM or end after 11:30PM
       bool isStartBefore5AM = startDateTime.hour < 5;
       bool isEndAfter1130PM = endDateTime.hour > 23 ||
           (endDateTime.hour == 23 && endDateTime.minute > 30);
@@ -1659,11 +1639,9 @@ class _InvoicePageState extends State<InvoicePage> {
             double.tryParse(invoiceData['driver_allowance'] ?? '0') ?? 0;
       }
 
-      // Total base before GST
       double totalBeforeGst =
           packageBaseFare + extrakmAmount + extraHoursAmount + agent_commission;
 
-      // GST and net total
       gst = totalBeforeGst * gstPercent / 100;
       netTotal = totalBeforeGst +
           gst +
@@ -1672,7 +1650,6 @@ class _InvoicePageState extends State<InvoicePage> {
           permit_charge +
           driverAllowance;
 
-      // Format all numbers to 2 decimal places
       baceAmount = double.parse(packageBaseFare.toStringAsFixed(2));
       packageBaseWithCommission =
           double.parse((packageBaseFare + agent_commission).toStringAsFixed(2));
@@ -1764,7 +1741,6 @@ class _InvoicePageState extends State<InvoicePage> {
 
       base_charge = baceAmount;
 
-      // Format all values to 2 decimal places
       baceAmount = double.parse(baceAmount.toStringAsFixed(2));
       totalbeforeGst = double.parse(totalbeforeGst.toStringAsFixed(2));
       gst = double.parse(gst.toStringAsFixed(2));
@@ -1856,7 +1832,7 @@ class _InvoicePageState extends State<InvoicePage> {
               color: Colors.white,
               border: Border.all(color: const Color(0xFFE2E8F0)),
               borderRadius: BorderRadius.circular(10),
-            ],
+            ),
             child: Table(
               columnWidths: const {
                 0: FlexColumnWidth(5),
