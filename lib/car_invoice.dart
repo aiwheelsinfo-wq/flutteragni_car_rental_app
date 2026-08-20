@@ -12,6 +12,7 @@ import 'dart:math';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:agni_car_rental/config/api_config.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class InvoicePage extends StatefulWidget {
   String bookingId;
@@ -228,19 +229,96 @@ class _InvoicePageState extends State<InvoicePage> {
     }
   }
 
-  pw.TableRow _buildPdfTableRow(String col1, String col2, String col3) {
+  pw.TableRow _buildModernPdfTableRow(
+    String col1,
+    String col2,
+    String col3, {
+    bool isHeader = false,
+    bool isAlt = false,
+    bool isTotal = false,
+  }) {
+    final bgColor = isHeader
+        ? PdfColor.fromHex('#1E3A8A')
+        : isTotal
+            ? PdfColor.fromHex('#F1F5F9')
+            : isAlt
+                ? PdfColor.fromHex('#F8FAFC')
+                : PdfColors.white;
+
+    final textColor = isHeader
+        ? PdfColors.white
+        : isTotal
+            ? PdfColor.fromHex('#0F172A')
+            : PdfColor.fromHex('#1E293B');
+
+    final textWeight =
+        (isHeader || isTotal) ? pw.FontWeight.bold : pw.FontWeight.normal;
+    final fontSize = isHeader ? 9.5 : (isTotal ? 10.5 : 9.0);
+
     return pw.TableRow(
+      decoration: pw.BoxDecoration(
+        color: bgColor,
+        border: pw.Border(
+          bottom: pw.BorderSide(
+            color: isHeader
+                ? PdfColor.fromHex('#1E3A8A')
+                : PdfColor.fromHex('#E2E8F0'),
+            width: isTotal ? 1.2 : 0.5,
+          ),
+        ),
+      ),
       children: [
         pw.Padding(
-            padding: const pw.EdgeInsets.all(4.0),
-            child: pw.Text(col1,
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5.5),
+          child: pw.Text(
+            col1,
+            style: pw.TextStyle(
+              fontWeight: (col1 == 'TOTAL' || isHeader)
+                  ? pw.FontWeight.bold
+                  : textWeight,
+              fontSize: fontSize,
+              color: textColor,
+            ),
+          ),
+        ),
         pw.Padding(
-            padding: const pw.EdgeInsets.all(4.0),
-            child: pw.Text(col2, style: const pw.TextStyle(fontSize: 10))),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5.5),
+          child: pw.Text(
+            col2,
+            style: pw.TextStyle(
+              fontWeight: textWeight,
+              fontSize: fontSize,
+              color: isHeader ? PdfColors.white : PdfColor.fromHex('#475569'),
+            ),
+          ),
+        ),
         pw.Padding(
-            padding: const pw.EdgeInsets.all(4.0),
-            child: pw.Text(col3, style: const pw.TextStyle(fontSize: 10))),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5.5),
+          child: pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              col3.isNotEmpty
+                  ? (col3.startsWith('Rs') ||
+                          col3.startsWith('₹') ||
+                          col3 == 'TOTAL' ||
+                          isHeader
+                      ? col3
+                      : '₹$col3')
+                  : '',
+              style: pw.TextStyle(
+                fontWeight: (col1 == 'TOTAL' || isHeader)
+                    ? pw.FontWeight.bold
+                    : (isTotal ? pw.FontWeight.bold : pw.FontWeight.medium),
+                fontSize: fontSize,
+                color: isHeader
+                    ? PdfColors.white
+                    : (col1 == 'TOTAL'
+                        ? PdfColor.fromHex('#1E3A8A')
+                        : textColor),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -248,15 +326,17 @@ class _InvoicePageState extends State<InvoicePage> {
   Future<pw.Document> _generateDocument() async {
     final pdf = pw.Document();
     final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
-    
+
     final totalKm = double.parse(invoiceData['closing_km']!) -
         double.parse(invoiceData['starting_km']!);
     final startingDate = invoiceData['starting_date']; // e.g., "2025-04-26"
     final startingTime = invoiceData['starting_time']; // e.g., "09:00:00"
     final closingDate = invoiceData['closing_date']; // e.g., "2025-04-26"
     final closingTime = invoiceData['closing_time']; // e.g., "17:30:00"
-    final startDateTime = DateTime.tryParse('$startingDate $startingTime') ?? DateTime.now();
-    var endDateTime = DateTime.tryParse('$closingDate $closingTime') ?? DateTime.now();
+    final startDateTime =
+        DateTime.tryParse('$startingDate $startingTime') ?? DateTime.now();
+    var endDateTime =
+        DateTime.tryParse('$closingDate $closingTime') ?? DateTime.now();
     if (endDateTime.isBefore(startDateTime)) {
       endDateTime = endDateTime.add(const Duration(days: 1));
     }
@@ -368,7 +448,10 @@ class _InvoicePageState extends State<InvoicePage> {
       try {
         final bStartStr = invoiceData['booked_start_date'] ?? '';
         final bReturnStr = invoiceData['booked_return_date'] ?? '';
-        if (bStartStr.isNotEmpty && bReturnStr.isNotEmpty && bStartStr != '0000-00-00' && bReturnStr != '0000-00-00') {
+        if (bStartStr.isNotEmpty &&
+            bReturnStr.isNotEmpty &&
+            bStartStr != '0000-00-00' &&
+            bReturnStr != '0000-00-00') {
           try {
             final bStart = DateFormat('dd MMM yyyy').parse(bStartStr);
             final bReturn = DateFormat('dd MMM yyyy').parse(bReturnStr);
@@ -390,7 +473,8 @@ class _InvoicePageState extends State<InvoicePage> {
 
       double commissionRateVal = 0.0;
       if (agent_commission > 0 && days > 0 && daily_limit > 0) {
-        commissionRateVal = (agent_commission / (daily_limit * days)).roundToDouble();
+        commissionRateVal =
+            (agent_commission / (daily_limit * days)).roundToDouble();
       }
       commissionRate = commissionRateVal;
       baseKmCharge = (maxKm ?? 0) * kmRate;
@@ -426,7 +510,8 @@ class _InvoicePageState extends State<InvoicePage> {
       double totalbeforeGst = baceAmount;
 
       gst = baceAmount * gstPercent / 100;
-      netTotal = baceAmount + gst + parking_charge + toll_charge + permit_charge;
+      netTotal =
+          baceAmount + gst + parking_charge + toll_charge + permit_charge;
 
       base_charge = baceAmount;
 
@@ -442,235 +527,704 @@ class _InvoicePageState extends State<InvoicePage> {
       netTotal = double.parse(invoiceData['total_amount'].toString());
     }
 
-    final double advancedAmount = double.tryParse(invoiceData['paid_amount']?.toString() ?? '') ?? 0.0;
+    final double advancedAmount =
+        double.tryParse(invoiceData['paid_amount']?.toString() ?? '') ?? 0.0;
     final double balanceAmount = (netTotal ?? 0.0) - advancedAmount;
 
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
+        margin: const pw.EdgeInsets.all(28),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Center(
-                child: pw.Text("CAR INVOICE",
-                    style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-              ),
-              pw.SizedBox(height: 8),
-              if (_isAgentInvoice) ...[
-                pw.Text(_agentHeaderName,
-                    style: pw.TextStyle(
-                        fontWeight: pw.FontWeight.bold, fontSize: 14)),
-                if (_agentHeaderAddress.isNotEmpty)
-                  pw.Text(_agentHeaderAddress,
-                      style: const pw.TextStyle(fontSize: 12)),
-                if (_agentHeaderContact.isNotEmpty)
-                  pw.Text(_agentHeaderContact,
-                      style: const pw.TextStyle(fontSize: 12)),
-                if (_agentHeaderGst.isNotEmpty)
-                  pw.Text("GST No: $_agentHeaderGst",
-                      style: const pw.TextStyle(fontSize: 12)),
-              ] else ...[
-                pw.Text("RENTOX CAR ",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-                pw.Text(
-                    "7, Jalaram Niwas, Ganesh Gawde Road, \nMulund (W), Mumbai - 400080",
-                    style: const pw.TextStyle(fontSize: 12)),
-                pw.Text(
-                    "Tel: 9619936999 | Email: agnicarrental@gmail.com \nWebsite: www.agnicarrental.com",
-                    style: const pw.TextStyle(fontSize: 12)),
-                pw.Text("GST No: 27AABPG5706A3ZB", style: const pw.TextStyle(fontSize: 12)),
-              ],
-              pw.SizedBox(height: 8),
-              pw.Align(
-                alignment: pw.Alignment.centerRight,
-                child: pw.Text("Date: ${invoiceData['invoieceDate']}",
-                    style: const pw.TextStyle(fontSize: 12)),
-              ),
-              pw.SizedBox(height: 8),
+              // Top Brand Header & Invoice Summary Box
               pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Container(
-                      width: 100,
-                      child: pw.Text("Bill No:",
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
-                  pw.Expanded(child: pw.Text("${invoiceData['invoiceNumber']}", style: const pw.TextStyle(fontSize: 12))),
-                ],
-              ),
-              if (!_isAgentInvoice && invoiceData['gst_number'] != 'Not Generated' &&
-                  invoiceData['gst_number'] != '') ...[
-                pw.Row(
-                  children: [
-                    pw.Container(
-                        width: 100,
-                        child: pw.Text("Business Name:",
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
-                    pw.Expanded(child: pw.Text(invoiceData['business_name']!, style: const pw.TextStyle(fontSize: 12))),
-                  ],
-                ),
-                pw.Row(
-                  children: [
-                    pw.Container(
-                        width: 100,
-                        child: pw.Text("Address:",
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
-                    pw.Expanded(child: pw.Text(invoiceData['business_address']!, style: const pw.TextStyle(fontSize: 12))),
-                  ],
-                ),
-                pw.Row(
-                  children: [
-                    pw.Container(
-                        width: 100,
-                        child: pw.Text("GST No:",
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
-                    pw.Expanded(child: pw.Text(invoiceData['gst_number']!, style: const pw.TextStyle(fontSize: 12))),
-                  ],
-                ),
-              ],
-              pw.SizedBox(height: 8),
-              pw.Row(
-                children: [
-                  pw.Container(
-                      width: 100,
-                      child: pw.Text("Passenger:",
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
-                  pw.Expanded(child: pw.Text(invoiceData['cus_name']!, style: const pw.TextStyle(fontSize: 12))),
-                ],
-              ),
-              pw.Row(
-                children: [
-                  pw.Container(
-                      width: 100,
-                      child: pw.Text("Trip Type:",
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
-                  pw.Expanded(child: pw.Text(invoiceData['trip_type']!, style: const pw.TextStyle(fontSize: 12))),
-                ],
-              ),
-              pw.Row(
-                children: [
-                  pw.Container(
-                      width: 100,
-                      child: pw.Text("Vehicle:",
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
-                  pw.Expanded(child: pw.Text(invoiceData['car_type']!, style: const pw.TextStyle(fontSize: 12))),
-                ],
-              ),
-              pw.Row(
-                children: [
-                  pw.Container(
-                      width: 100,
-                      child: pw.Text("From",
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
-                  pw.Expanded(child: pw.Text('${invoiceData['from']}', style: const pw.TextStyle(fontSize: 12))),
-                ],
-              ),
-              if (invoiceData['trip_type'] != 'Local-Duty') ...[
-                pw.Row(
-                  children: [
-                    pw.Container(
-                        width: 100,
-                        child: pw.Text("To ",
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
-                    pw.Expanded(child: pw.Text('${invoiceData['to']}', style: const pw.TextStyle(fontSize: 12))),
-                  ],
-                ),
-              ],
-              pw.Row(
-                children: [
-                  pw.Container(
-                      width: 100,
-                      child: pw.Text("Date:",
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12))),
-                  pw.Expanded(child: pw.Text(invoiceData['starting_date']!, style: const pw.TextStyle(fontSize: 12))),
+                  pw.Expanded(
+                    flex: 6,
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: pw.BoxDecoration(
+                            color: PdfColor.fromHex('#EFF6FF'),
+                            borderRadius:
+                                const pw.BorderRadius.all(pw.Radius.circular(4)),
+                            border: pw.Border.all(
+                                color: PdfColor.fromHex('#BFDBFE'), width: 0.8),
+                          ),
+                          child: pw.Text(
+                            "CAR RENTAL INVOICE",
+                            style: pw.TextStyle(
+                              color: PdfColor.fromHex('#1E3A8A'),
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ),
+                        pw.SizedBox(height: 6),
+                        if (_isAgentInvoice) ...[
+                          pw.Text(
+                            _agentHeaderName,
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 16,
+                              color: PdfColor.fromHex('#0F172A'),
+                            ),
+                          ),
+                          if (_agentHeaderAddress.isNotEmpty) ...[
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                              _agentHeaderAddress,
+                              style: pw.TextStyle(
+                                  fontSize: 9.5,
+                                  color: PdfColor.fromHex('#475569')),
+                            ),
+                          ],
+                          if (_agentHeaderContact.isNotEmpty) ...[
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                              _agentHeaderContact,
+                              style: pw.TextStyle(
+                                  fontSize: 9.5,
+                                  color: PdfColor.fromHex('#475569')),
+                            ),
+                          ],
+                          if (_agentHeaderGst.isNotEmpty) ...[
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                              "GSTIN: $_agentHeaderGst",
+                              style: pw.TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColor.fromHex('#1E3A8A')),
+                            ),
+                          ],
+                        ] else ...[
+                          pw.Text(
+                            "RENTOX CAR",
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 16,
+                              color: PdfColor.fromHex('#0F172A'),
+                            ),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.Text(
+                            "7, Jalaram Niwas, Ganesh Gawde Road, Mulund (W), Mumbai - 400080",
+                            style: pw.TextStyle(
+                                fontSize: 9.5,
+                                color: PdfColor.fromHex('#475569')),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.Text(
+                            "Tel: 9619936999 | Email: agnicarrental@gmail.com | Web: www.agnicarrental.com",
+                            style: pw.TextStyle(
+                                fontSize: 9.5,
+                                color: PdfColor.fromHex('#475569')),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.Text(
+                            "GSTIN: 27AABPG5706A3ZB",
+                            style: pw.TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColor.fromHex('#1E3A8A')),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(width: 16),
+                  pw.Expanded(
+                    flex: 4,
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(10),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColor.fromHex('#F8FAFC'),
+                        borderRadius:
+                            const pw.BorderRadius.all(pw.Radius.circular(6)),
+                        border: pw.Border.all(
+                            color: PdfColor.fromHex('#E2E8F0'), width: 1),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Row(
+                            mainAxisAlignment:
+                                pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Text("BILL NO:",
+                                  style: pw.TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: PdfColor.fromHex('#64748B'))),
+                              pw.Text("#${invoiceData['invoiceNumber']}",
+                                  style: pw.TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: PdfColor.fromHex('#0F172A'))),
+                            ],
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Divider(
+                              color: PdfColor.fromHex('#E2E8F0'),
+                              thickness: 0.6),
+                          pw.SizedBox(height: 4),
+                          pw.Row(
+                            mainAxisAlignment:
+                                pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Text("DATE:",
+                                  style: pw.TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: PdfColor.fromHex('#64748B'))),
+                              pw.Text("${invoiceData['invoieceDate']}",
+                                  style: pw.TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: pw.FontWeight.medium,
+                                      color: PdfColor.fromHex('#0F172A'))),
+                            ],
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Row(
+                            mainAxisAlignment:
+                                pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Text("TRIP TYPE:",
+                                  style: pw.TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: PdfColor.fromHex('#64748B'))),
+                              pw.Text("${invoiceData['trip_type']}",
+                                  style: pw.TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: PdfColor.fromHex('#1E3A8A'))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
               pw.SizedBox(height: 12),
-              pw.Table(
-                columnWidths: {
-                  0: const pw.FlexColumnWidth(3),
-                  1: const pw.FlexColumnWidth(3),
-                  2: const pw.FlexColumnWidth(2),
-                },
-                border: pw.TableBorder.all(),
+
+              // Customer & Route Cards Row
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  _buildPdfTableRow('Starting Date', dateFormat.format(startDateTime), ''),
-                  _buildPdfTableRow('Ending Date', dateFormat.format(endDateTime), ''),
-
-                  if (invoiceData['trip_type'] == 'Local-Duty' ||
-                      invoiceData['trip_type'] == 'Round-Trip') ...[
-                    _buildPdfTableRow('Starting Km ', invoiceData['starting_km']!, ''),
-                    _buildPdfTableRow('Ending Km ', invoiceData['closing_km']!, ''),
-                    _buildPdfTableRow('Total Km', totalKm.toStringAsFixed(2), ''),
-                  ],
-                  if (invoiceData['trip_type'] == 'Local-Duty') ...[
-                    _buildPdfTableRow(
-                        'Package',
-                        '${invoiceData['packageHours'].toString()} Hours - ${invoiceData['packageKm'].toString()} Km',
-                        '$packageBaseWithCommission'),
-                    _buildPdfTableRow(
-                        'Extra Km',
-                        'Rs ${invoiceData['extra_km_price']} *  $extraKm Km ',
-                        '$extrakmAmount'),
-                    _buildPdfTableRow(
-                        'Extra Hrs',
-                        'Rs ${invoiceData['extra_hours_price']} * $extraHours Hrs',
-                        '$extraHoursAmount'),
-                  ],
-                  if (invoiceData['trip_type'] == 'Round-Trip') ...[
-                    _buildPdfTableRow(
-                        'Total Km charge', '$maxKm x $commissionFormulaText', '$baceAmount'),
-                    _buildPdfTableRow('Total Days', '$totalDays', ''),
-                  ],
-
-                  _buildPdfTableRow('Parking', '', '$parking_charge'),
-                  if (invoiceData['trip_type'] != 'One-way') ...[
-                    _buildPdfTableRow('Toll', '', '$toll_charge'),
-                    _buildPdfTableRow('Permit Charge', '', '$permit_charge'),
-                  ],
-                  _buildPdfTableRow('Driver Allowance', '', '${driver_allowance ?? ""} '),
-
-                  if (invoiceData['trip_type'] == 'One-way') ...[
-                    _buildPdfTableRow('Base Amount', '', '${baceAmount!.toStringAsFixed(2)}'),
-                    _buildPdfTableRow('Total Charge', '', '${(baceAmount! + parking_charge!).toStringAsFixed(2)}'),
-                  ],
-
-                  if (invoiceData['trip_type'] != 'Local-taxi') ...[
-                    if (isIntraState) ...[
-                      _buildPdfTableRow('CGST ${(gstPercent / 2).toStringAsFixed(1)}%', '', '${(gst! / 2).toStringAsFixed(2)}'),
-                      _buildPdfTableRow('SGST ${(gstPercent / 2).toStringAsFixed(1)}%', '', '${(gst! / 2).toStringAsFixed(2)}'),
-                    ] else ...[
-                      _buildPdfTableRow('IGST ${gstPercent.toStringAsFixed(1)}%', '', '${gst!.toStringAsFixed(2)}'),
-                    ],
-                  ],
-
-                  _buildPdfTableRow('TOTAL', '', '$netTotal'),
-                  _buildPdfTableRow('Advanced Amount', '', '${advancedAmount.toStringAsFixed(2)}'),
-                  _buildPdfTableRow('Balance Amount', '', '${balanceAmount.toStringAsFixed(2)}'),
+                  // Customer Card
+                  pw.Expanded(
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(10),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColor.fromHex('#F8FAFC'),
+                        borderRadius:
+                            const pw.BorderRadius.all(pw.Radius.circular(6)),
+                        border: pw.Border.all(
+                            color: PdfColor.fromHex('#E2E8F0'), width: 1),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            "CUSTOMER INFORMATION",
+                            style: pw.TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColor.fromHex('#1E3A8A'),
+                                letterSpacing: 0.5),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text(
+                            "Passenger: ${invoiceData['cus_name']}",
+                            style: pw.TextStyle(
+                                fontSize: 10,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColor.fromHex('#0F172A')),
+                          ),
+                          if (!_isAgentInvoice &&
+                              invoiceData['gst_number'] != 'Not Generated' &&
+                              invoiceData['gst_number'] != '') ...[
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                                "Business: ${invoiceData['business_name']}",
+                                style: pw.TextStyle(
+                                    fontSize: 9,
+                                    color: PdfColor.fromHex('#475569'))),
+                            pw.Text(
+                                "Address: ${invoiceData['business_address']}",
+                                style: pw.TextStyle(
+                                    fontSize: 9,
+                                    color: PdfColor.fromHex('#475569'))),
+                            pw.Text("GSTIN: ${invoiceData['gst_number']}",
+                                style: pw.TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: pw.FontWeight.bold,
+                                    color: PdfColor.fromHex('#1E3A8A'))),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  pw.SizedBox(width: 10),
+                  // Trip & Route Card
+                  pw.Expanded(
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(10),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColor.fromHex('#F8FAFC'),
+                        borderRadius:
+                            const pw.BorderRadius.all(pw.Radius.circular(6)),
+                        border: pw.Border.all(
+                            color: PdfColor.fromHex('#E2E8F0'), width: 1),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            "VEHICLE & ROUTE",
+                            style: pw.TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColor.fromHex('#1E3A8A'),
+                                letterSpacing: 0.5),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text(
+                            "Vehicle: ${invoiceData['car_type']}",
+                            style: pw.TextStyle(
+                                fontSize: 10,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColor.fromHex('#0F172A')),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.Text(
+                            invoiceData['trip_type'] != 'Local-Duty'
+                                ? "Route: ${invoiceData['from']} -> ${invoiceData['to']}"
+                                : "Location: ${invoiceData['from']}",
+                            style: pw.TextStyle(
+                                fontSize: 9,
+                                color: PdfColor.fromHex('#475569')),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.Text(
+                            "Date: ${invoiceData['starting_date']}",
+                            style: pw.TextStyle(
+                                fontSize: 9,
+                                color: PdfColor.fromHex('#475569')),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              if (userType == 'agent') ...[
-                pw.SizedBox(height: 4),
-                pw.Text("Agent Commission is included in the above amount",
-                    style: const pw.TextStyle(fontSize: 10)),
-              ],
-              if (!_isAgentInvoice) ...[
-                pw.SizedBox(height: 12),
-                pw.Text("Bank Details:",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-                pw.Text("Federal Bank", style: const pw.TextStyle(fontSize: 12)),
-                pw.Text("RENTOX CAR ", style: const pw.TextStyle(fontSize: 12)),
-                pw.Text("A/c No.: 15390200008421", style: const pw.TextStyle(fontSize: 12)),
-                pw.Text("IFSC CODE: FDRL0001539", style: const pw.TextStyle(fontSize: 12)),
-              ],
-              pw.SizedBox(height: 20),
-              pw.Text("Authorized Sign.", style: const pw.TextStyle(fontSize: 12)),
-              if (!_isAgentInvoice) ...[
-                pw.SizedBox(height: 8),
-                pw.Text(
-                    "Kindly issue a crossed cheque in favour of AGNI CAR RENTAL \"Subject To Mumbai Jurisdiction\"",
-                    style: const pw.TextStyle(fontSize: 10)),
-              ],
+              pw.SizedBox(height: 10),
+
+              // Meter & Journey Summary Strip
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 7),
+                decoration: pw.BoxDecoration(
+                  color: PdfColor.fromHex('#F1F5F9'),
+                  borderRadius:
+                      const pw.BorderRadius.all(pw.Radius.circular(6)),
+                  border: pw.Border.all(
+                      color: PdfColor.fromHex('#E2E8F0'), width: 1),
+                ),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text("STARTING",
+                            style: pw.TextStyle(
+                                fontSize: 7.5,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColor.fromHex('#64748B'))),
+                        pw.Text(dateFormat.format(startDateTime),
+                            style: pw.TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: pw.FontWeight.medium,
+                                color: PdfColor.fromHex('#0F172A'))),
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text("ENDING",
+                            style: pw.TextStyle(
+                                fontSize: 7.5,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColor.fromHex('#64748B'))),
+                        pw.Text(dateFormat.format(endDateTime),
+                            style: pw.TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: pw.FontWeight.medium,
+                                color: PdfColor.fromHex('#0F172A'))),
+                      ],
+                    ),
+                    if (invoiceData['trip_type'] == 'Local-Duty' ||
+                        invoiceData['trip_type'] == 'Round-Trip') ...[
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text("START KM",
+                              style: pw.TextStyle(
+                                  fontSize: 7.5,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColor.fromHex('#64748B'))),
+                          pw.Text(invoiceData['starting_km']!,
+                              style: pw.TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: pw.FontWeight.medium,
+                                  color: PdfColor.fromHex('#0F172A'))),
+                        ],
+                      ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text("END KM",
+                              style: pw.TextStyle(
+                                  fontSize: 7.5,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColor.fromHex('#64748B'))),
+                          pw.Text(invoiceData['closing_km']!,
+                              style: pw.TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: pw.FontWeight.medium,
+                                  color: PdfColor.fromHex('#0F172A'))),
+                        ],
+                      ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text("TOTAL KM",
+                              style: pw.TextStyle(
+                                  fontSize: 7.5,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColor.fromHex('#1E3A8A'))),
+                          pw.Text("${totalKm.toStringAsFixed(2)} KM",
+                              style: pw.TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColor.fromHex('#1E3A8A'))),
+                        ],
+                      ),
+                    ],
+                    if (invoiceData['trip_type'] == 'Round-Trip') ...[
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text("DAYS",
+                              style: pw.TextStyle(
+                                  fontSize: 7.5,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColor.fromHex('#64748B'))),
+                          pw.Text("$totalDays Days",
+                              style: pw.TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColor.fromHex('#0F172A'))),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 10),
+
+              // Modern Fare Breakdown Table
+              pw.ClipRRect(
+                horizontalRadius: 6,
+                verticalRadius: 6,
+                child: pw.Table(
+                  columnWidths: {
+                    0: const pw.FlexColumnWidth(5),
+                    1: const pw.FlexColumnWidth(3),
+                    2: const pw.FlexColumnWidth(2),
+                  },
+                  children: [
+                    _buildModernPdfTableRow(
+                        'DESCRIPTION', 'RATE / DETAILS', 'AMOUNT',
+                        isHeader: true),
+                    if (invoiceData['trip_type'] == 'Local-Duty') ...[
+                      _buildModernPdfTableRow(
+                        'Package',
+                        '${invoiceData['packageHours']} Hours - ${invoiceData['packageKm']} Km',
+                        '$packageBaseWithCommission',
+                      ),
+                      _buildModernPdfTableRow(
+                        'Extra Km',
+                        'Rs ${invoiceData['extra_km_price']} * $extraKm Km',
+                        '$extrakmAmount',
+                        isAlt: true,
+                      ),
+                      _buildModernPdfTableRow(
+                        'Extra Hrs',
+                        'Rs ${invoiceData['extra_hours_price']} * $extraHours Hrs',
+                        '$extraHoursAmount',
+                      ),
+                    ],
+                    if (invoiceData['trip_type'] == 'Round-Trip') ...[
+                      _buildModernPdfTableRow(
+                        'Total Km charge',
+                        '$maxKm x $commissionFormulaText',
+                        '$baceAmount',
+                      ),
+                      _buildModernPdfTableRow(
+                          'Total Days', '$totalDays Days', '',
+                          isAlt: true),
+                    ],
+                    _buildModernPdfTableRow('Parking', '', '$parking_charge'),
+                    if (invoiceData['trip_type'] != 'One-way') ...[
+                      _buildModernPdfTableRow('Toll', '', '$toll_charge',
+                          isAlt: true),
+                      _buildModernPdfTableRow(
+                          'Permit Charge', '', '$permit_charge'),
+                    ],
+                    _buildModernPdfTableRow(
+                        'Driver Allowance', '', '${driver_allowance ?? ""} ',
+                        isAlt: true),
+                    if (invoiceData['trip_type'] == 'One-way') ...[
+                      _buildModernPdfTableRow(
+                          'Base Amount', '', '${baceAmount!.toStringAsFixed(2)}'),
+                      _buildModernPdfTableRow('Total Charge', '',
+                          '${(baceAmount! + parking_charge!).toStringAsFixed(2)}',
+                          isAlt: true),
+                    ],
+                    if (invoiceData['trip_type'] != 'Local-taxi') ...[
+                      if (isIntraState) ...[
+                        _buildModernPdfTableRow(
+                            'CGST ${(gstPercent / 2).toStringAsFixed(1)}%',
+                            '',
+                            '${(gst! / 2).toStringAsFixed(2)}'),
+                        _buildModernPdfTableRow(
+                            'SGST ${(gstPercent / 2).toStringAsFixed(1)}%',
+                            '',
+                            '${(gst! / 2).toStringAsFixed(2)}',
+                            isAlt: true),
+                      ] else ...[
+                        _buildModernPdfTableRow(
+                            'IGST ${gstPercent.toStringAsFixed(1)}%',
+                            '',
+                            '${gst!.toStringAsFixed(2)}'),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 10),
+
+              // Total & Payment Summary Row
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  // Left side info (Agent commission note or Bank Details)
+                  pw.Expanded(
+                    flex: 5,
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        if (userType == 'agent') ...[
+                          pw.Container(
+                            padding: const pw.EdgeInsets.all(7),
+                            decoration: pw.BoxDecoration(
+                              color: PdfColor.fromHex('#EFF6FF'),
+                              borderRadius:
+                                  const pw.BorderRadius.all(pw.Radius.circular(4)),
+                              border: pw.Border.all(
+                                  color: PdfColor.fromHex('#BFDBFE'), width: 0.8),
+                            ),
+                            child: pw.Text(
+                              "Agent Commission is included in the above amount",
+                              style: pw.TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: pw.FontWeight.medium,
+                                  color: PdfColor.fromHex('#1E3A8A')),
+                            ),
+                          ),
+                          pw.SizedBox(height: 6),
+                        ],
+                        if (!_isAgentInvoice) ...[
+                          pw.Container(
+                            padding: const pw.EdgeInsets.all(7),
+                            decoration: pw.BoxDecoration(
+                              color: PdfColor.fromHex('#F8FAFC'),
+                              borderRadius:
+                                  const pw.BorderRadius.all(pw.Radius.circular(4)),
+                              border: pw.Border.all(
+                                  color: PdfColor.fromHex('#E2E8F0'), width: 0.8),
+                            ),
+                            child: pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: [
+                                pw.Text("BANK PAYMENT DETAILS",
+                                    style: pw.TextStyle(
+                                        fontWeight: pw.FontWeight.bold,
+                                        fontSize: 8,
+                                        color: PdfColor.fromHex('#1E3A8A'))),
+                                pw.SizedBox(height: 2),
+                                pw.Text("Bank: Federal Bank | A/c: RENTOX CAR",
+                                    style: pw.TextStyle(
+                                        fontSize: 8,
+                                        color: PdfColor.fromHex('#334155'))),
+                                pw.Text(
+                                    "A/c No: 15390200008421 | IFSC: FDRL0001539",
+                                    style: pw.TextStyle(
+                                        fontSize: 8,
+                                        color: PdfColor.fromHex('#334155'))),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(width: 14),
+                  // Right side Payment Summary Card
+                  pw.Expanded(
+                    flex: 5,
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColor.fromHex('#F8FAFC'),
+                        borderRadius:
+                            const pw.BorderRadius.all(pw.Radius.circular(6)),
+                        border: pw.Border.all(
+                            color: PdfColor.fromHex('#CBD5E1'), width: 1),
+                      ),
+                      child: pw.Column(
+                        children: [
+                          pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 6),
+                            decoration: pw.BoxDecoration(
+                              color: PdfColor.fromHex('#1E3A8A'),
+                              borderRadius:
+                                  const pw.BorderRadius.all(pw.Radius.circular(4)),
+                            ),
+                            child: pw.Row(
+                              mainAxisAlignment:
+                                  pw.MainAxisAlignment.spaceBetween,
+                              children: [
+                                pw.Text("TOTAL",
+                                    style: pw.TextStyle(
+                                        color: PdfColors.white,
+                                        fontWeight: pw.FontWeight.bold,
+                                        fontSize: 10)),
+                                pw.Text("₹$netTotal",
+                                    style: pw.TextStyle(
+                                        color: PdfColors.white,
+                                        fontWeight: pw.FontWeight.bold,
+                                        fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                          pw.SizedBox(height: 5),
+                          pw.Row(
+                            mainAxisAlignment:
+                                pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Text("Advance Amount",
+                                  style: pw.TextStyle(
+                                      fontSize: 8.5,
+                                      color: PdfColor.fromHex('#475569'))),
+                              pw.Text("₹${advancedAmount.toStringAsFixed(2)}",
+                                  style: pw.TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: PdfColor.fromHex('#059669'))),
+                            ],
+                          ),
+                          pw.SizedBox(height: 3),
+                          pw.Divider(
+                              color: PdfColor.fromHex('#E2E8F0'),
+                              thickness: 0.6),
+                          pw.SizedBox(height: 3),
+                          pw.Row(
+                            mainAxisAlignment:
+                                pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Text("Balance Amount",
+                                  style: pw.TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: PdfColor.fromHex('#0F172A'))),
+                              pw.Text("₹${balanceAmount.toStringAsFixed(2)}",
+                                  style: pw.TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: balanceAmount > 0
+                                          ? PdfColor.fromHex('#DC2626')
+                                          : PdfColor.fromHex('#0F172A'))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              pw.Spacer(),
+
+              // Modern Footer & Signature
+              pw.Divider(color: PdfColor.fromHex('#CBD5E1'), thickness: 0.8),
+              pw.SizedBox(height: 4),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      if (!_isAgentInvoice) ...[
+                        pw.Text(
+                          "Kindly issue a crossed cheque in favour of AGNI CAR RENTAL \"Subject To Mumbai Jurisdiction\"",
+                          style: pw.TextStyle(
+                              fontSize: 7,
+                              color: PdfColor.fromHex('#64748B')),
+                        ),
+                      ] else ...[
+                        pw.Text(
+                          "Thank you for choosing $_agentHeaderName",
+                          style: pw.TextStyle(
+                              fontSize: 8,
+                              fontWeight: pw.FontWeight.medium,
+                              color: PdfColor.fromHex('#1E3A8A')),
+                        ),
+                      ],
+                    ],
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Container(
+                          width: 100,
+                          height: 1,
+                          color: PdfColor.fromHex('#94A3B8')),
+                      pw.SizedBox(height: 2),
+                      pw.Text("Authorized Signatory",
+                          style: pw.TextStyle(
+                              fontSize: 7.5,
+                              fontWeight: pw.FontWeight.bold,
+                              color: PdfColor.fromHex('#334155'))),
+                    ],
+                  ),
+                ],
+              ),
             ],
           );
         },
@@ -685,7 +1239,7 @@ class _InvoicePageState extends State<InvoicePage> {
       final outputDir = await getTemporaryDirectory();
       final file = File("${outputDir.path}/invoice_${widget.bookingId}.pdf");
       await file.writeAsBytes(await pdf.save());
-      
+
       await Share.shareXFiles(
         [XFile(file.path)],
         text: 'Invoice for Booking #${widget.bookingId}',
@@ -705,7 +1259,7 @@ class _InvoicePageState extends State<InvoicePage> {
     }
     try {
       final pdf = await _generateDocument();
-      
+
       Directory? targetDir;
       if (Platform.isAndroid) {
         targetDir = Directory('/storage/emulated/0/Download');
@@ -741,7 +1295,7 @@ class _InvoicePageState extends State<InvoicePage> {
         final targetDir = await getApplicationDocumentsDirectory();
         final file = File("${targetDir.path}/invoice_${widget.bookingId}.pdf");
         await file.writeAsBytes(await pdf.save());
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text("Saved to app folder. Tap to view invoice."),
@@ -767,23 +1321,31 @@ class _InvoicePageState extends State<InvoicePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text("Invoice"),
+        title: Text(
+          "Invoice #${invoiceData['invoiceNumber']}",
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.save_alt),
-            tooltip: "Save Invoice",
+            icon: const Icon(Icons.download_rounded),
+            tooltip: "Download PDF",
             onPressed: () => _savePDF(context),
           ),
           IconButton(
-            icon: const Icon(Icons.share),
-            tooltip: "Share Invoice",
+            icon: const Icon(Icons.share_rounded),
+            tooltip: "Share PDF",
             onPressed: () => _sharePDF(context),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
         child: _buildInvoiceContent(),
       ),
     );
@@ -793,107 +1355,237 @@ class _InvoicePageState extends State<InvoicePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Center(
-          child: Text("CAR INVOICE",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        // Modern Header Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Text(
+                      "CAR RENTAL INVOICE",
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1E3A8A),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      "Bill #${invoiceData['invoiceNumber']}",
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (_isAgentInvoice) ...[
+                Text(
+                  _agentHeaderName,
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                if (_agentHeaderAddress.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(_agentHeaderAddress,
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: const Color(0xFF475569))),
+                ],
+                if (_agentHeaderContact.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(_agentHeaderContact,
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: const Color(0xFF475569))),
+                ],
+                if (_agentHeaderGst.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text("GSTIN: $_agentHeaderGst",
+                      style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E3A8A))),
+                ],
+              ] else ...[
+                Text(
+                  "RENTOX CAR",
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                    "7, Jalaram Niwas, Ganesh Gawde Road, Mulund (W), Mumbai - 400080",
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: const Color(0xFF475569))),
+                const SizedBox(height: 2),
+                Text(
+                    "Tel: 9619936999 | Email: agnicarrental@gmail.com | Web: www.agnicarrental.com",
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: const Color(0xFF475569))),
+                const SizedBox(height: 2),
+                Text("GSTIN: 27AABPG5706A3ZB",
+                    style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1E3A8A))),
+              ],
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("Date: ${invoiceData['invoieceDate']}",
+                      style: GoogleFonts.poppins(
+                          fontSize: 11, color: const Color(0xFF64748B))),
+                  Text("Trip: ${invoiceData['trip_type']}",
+                      style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E3A8A))),
+                ],
+              ),
+            ],
+          ),
         ),
-        SizedBox(height: 8),
-        if (_isAgentInvoice) ...[
-          Text(_agentHeaderName,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          if (_agentHeaderAddress.isNotEmpty)
-            Text(_agentHeaderAddress, style: TextStyle(fontSize: 12)),
-          if (_agentHeaderContact.isNotEmpty)
-            Text(_agentHeaderContact, style: TextStyle(fontSize: 12)),
-          if (_agentHeaderGst.isNotEmpty)
-            Text("GST No: $_agentHeaderGst", style: TextStyle(fontSize: 12)),
-        ] else ...[
-          Text("RENTOX CAR ",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          Text(
-              "7, Jalaram Niwas, Ganesh Gawde Road, \nMulund (W), Mumbai - 400080",
-              style: TextStyle(fontSize: 12)),
-          Text(
-              "Tel: 9619936999 | Email: agnicarrental@gmail.com \nWebsite: www.agnicarrental.com",
-              style: TextStyle(fontSize: 12)),
-          Text("GST No: 27AABPG5706A3ZB", style: TextStyle(fontSize: 12)),
-        ],
-        SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Text("Date: ${invoiceData['invoieceDate']}",
-              style: TextStyle(fontSize: 12)),
+        const SizedBox(height: 12),
+
+        // Customer & Trip Info Card
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "PASSENGER & ROUTE DETAILS",
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF1E3A8A),
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Divider(height: 16, color: Color(0xFFE2E8F0)),
+              _buildInfoRow(
+                  Icons.person_outline, "Passenger", invoiceData['cus_name']!),
+              if (!_isAgentInvoice &&
+                  invoiceData['gst_number'] != 'Not Generated' &&
+                  invoiceData['gst_number'] != '') ...[
+                _buildInfoRow(Icons.business_outlined, "Business Name",
+                    invoiceData['business_name']!),
+                _buildInfoRow(Icons.location_city_outlined, "Address",
+                    invoiceData['business_address']!),
+                _buildInfoRow(Icons.receipt_long_outlined, "GSTIN",
+                    invoiceData['gst_number']!),
+              ],
+              _buildInfoRow(Icons.directions_car_outlined, "Vehicle",
+                  invoiceData['car_type']!),
+              _buildInfoRow(Icons.trip_origin, "From", invoiceData['from']!),
+              if (invoiceData['trip_type'] != 'Local-Duty') ...[
+                _buildInfoRow(
+                    Icons.location_on_outlined, "To", invoiceData['to']!),
+              ],
+              _buildInfoRow(Icons.calendar_today_outlined, "Trip Date",
+                  invoiceData['starting_date']!),
+            ],
+          ),
         ),
-        SizedBox(height: 8),
-        _buildRow("Bill No:", "${invoiceData['invoiceNumber']}"),
-        if (!_isAgentInvoice && invoiceData['gst_number'] != 'Not Generated' &&
-            invoiceData['gst_number'] != '') ...[
-          _buildRow("Business Name:", invoiceData['business_name']!),
-          _buildRow("Address:", invoiceData['business_address']!),
-          _buildRow("GST No:", invoiceData['gst_number']!),
-        ],
-        SizedBox(height: 8),
-        _buildRow("Passenger:", invoiceData['cus_name']!),
-        _buildRow("Trip Type:", invoiceData['trip_type']!),
-        _buildRow("Vehicle:", invoiceData['car_type']!),
-        _buildRow("From", '${invoiceData['from']}'),
-        if (invoiceData['trip_type'] != 'Local-Duty') ...[
-          _buildRow("To ", '${invoiceData['to']}'),
-        ],
-        _buildRow("Date:", invoiceData['starting_date']!),
-        SizedBox(height: 8),
+        const SizedBox(height: 14),
+
+        // Table & Fare Breakdown
         _buildTable(),
-        if (userType == 'agent') ...[
-          Text("Agent Commission is inluded in the above amount",
-              style: TextStyle(fontSize: 10)),
-        ],
-        if (!_isAgentInvoice) ...[
-          SizedBox(height: 12),
-          Text("Bank Details:",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          Text("Federal Bank", style: TextStyle(fontSize: 12)),
-          Text("RENTOX CAR ", style: TextStyle(fontSize: 12)),
-          Text("A/c No.: 15390200008421", style: TextStyle(fontSize: 12)),
-          Text("IFSC CODE: FDRL0001539", style: TextStyle(fontSize: 12)),
-        ],
-        SizedBox(height: 20),
-        Text("Authorized Sign.", style: TextStyle(fontSize: 12)),
-        if (!_isAgentInvoice) ...[
-          SizedBox(height: 4),
-          Text(
-              "Kindly issue a crossed cheque in favour of AGNI CAR RENTAL \"Subject To Mumbai Jurisdiction\"",
-              style: TextStyle(fontSize: 10)),
-        ],
       ],
     );
   }
 
-  Widget _buildRow(String label, String value) {
+  Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      padding: const EdgeInsets.symmetric(vertical: 3.5),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-              width: 100,
-              child: Text(label,
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-          Expanded(child: Text(value, style: TextStyle(fontSize: 12))),
+          Icon(icon, size: 15, color: const Color(0xFF64748B)),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 105,
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF475569),
+              ),
+            ),
+          ),
+          const Text(": ", style: TextStyle(color: Color(0xFF94A3B8))),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildTable() {
-    final dateFormat =
-        DateFormat('yyyy-MM-dd hh:mm a'); // or your desired format
+    final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
     final totalKm = double.parse(invoiceData['closing_km']!) -
         double.parse(invoiceData['starting_km']!);
     final startingDate = invoiceData['starting_date']; // e.g., "2025-04-26"
     final startingTime = invoiceData['starting_time']; // e.g., "09:00:00"
     final closingDate = invoiceData['closing_date']; // e.g., "2025-04-26"
     final closingTime = invoiceData['closing_time']; // e.g., "17:30:00"
-    final startDateTime = DateTime.tryParse('$startingDate $startingTime') ?? DateTime.now();
-    var endDateTime = DateTime.tryParse('$closingDate $closingTime') ?? DateTime.now();
+    final startDateTime =
+        DateTime.tryParse('$startingDate $startingTime') ?? DateTime.now();
+    var endDateTime =
+        DateTime.tryParse('$closingDate $closingTime') ?? DateTime.now();
     if (endDateTime.isBefore(startDateTime)) {
       endDateTime = endDateTime.add(const Duration(days: 1));
     }
@@ -1005,7 +1697,10 @@ class _InvoicePageState extends State<InvoicePage> {
       try {
         final bStartStr = invoiceData['booked_start_date'] ?? '';
         final bReturnStr = invoiceData['booked_return_date'] ?? '';
-        if (bStartStr.isNotEmpty && bReturnStr.isNotEmpty && bStartStr != '0000-00-00' && bReturnStr != '0000-00-00') {
+        if (bStartStr.isNotEmpty &&
+            bReturnStr.isNotEmpty &&
+            bStartStr != '0000-00-00' &&
+            bReturnStr != '0000-00-00') {
           try {
             final bStart = DateFormat('dd MMM yyyy').parse(bStartStr);
             final bReturn = DateFormat('dd MMM yyyy').parse(bReturnStr);
@@ -1027,7 +1722,8 @@ class _InvoicePageState extends State<InvoicePage> {
 
       double commissionRateVal = 0.0;
       if (agent_commission > 0 && days > 0 && daily_limit > 0) {
-        commissionRateVal = (agent_commission / (daily_limit * days)).roundToDouble();
+        commissionRateVal =
+            (agent_commission / (daily_limit * days)).roundToDouble();
       }
       commissionRate = commissionRateVal;
       baseKmCharge = (maxKm ?? 0) * kmRate;
@@ -1063,7 +1759,8 @@ class _InvoicePageState extends State<InvoicePage> {
       double totalbeforeGst = baceAmount;
 
       gst = baceAmount * gstPercent / 100;
-      netTotal = baceAmount + gst + parking_charge + toll_charge + permit_charge;
+      netTotal =
+          baceAmount + gst + parking_charge + toll_charge + permit_charge;
 
       base_charge = baceAmount;
 
@@ -1079,90 +1776,453 @@ class _InvoicePageState extends State<InvoicePage> {
       netTotal = double.parse(invoiceData['total_amount'].toString());
     }
 
-    final double advancedAmount = double.tryParse(invoiceData['paid_amount']?.toString() ?? '') ?? 0.0;
+    final double advancedAmount =
+        double.tryParse(invoiceData['paid_amount']?.toString() ?? '') ?? 0.0;
     final double balanceAmount = (netTotal ?? 0.0) - advancedAmount;
 
-    return Table(
-      columnWidths: {
-        0: FlexColumnWidth(3), // First column (e.g., labels) wider
-        1: FlexColumnWidth(3), // Second column (e.g., data)
-        2: FlexColumnWidth(2), // Third column (e.g., amount)
-      },
-      border: TableBorder.all(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildTableRow('Starting Date', dateFormat.format(startDateTime), ''),
-        _buildTableRow('Ending Date', dateFormat.format(endDateTime), ''),
+        // Meter & Timeline Strip
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("STARTING",
+                          style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF64748B))),
+                      Text(dateFormat.format(startDateTime),
+                          style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF0F172A))),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text("ENDING",
+                          style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF64748B))),
+                      Text(dateFormat.format(endDateTime),
+                          style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF0F172A))),
+                    ],
+                  ),
+                ],
+              ),
+              if (invoiceData['trip_type'] == 'Local-Duty' ||
+                  invoiceData['trip_type'] == 'Round-Trip') ...[
+                const Divider(height: 14, color: Color(0xFFE2E8F0)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildMeterCell("START KM", invoiceData['starting_km']!),
+                    _buildMeterCell("END KM", invoiceData['closing_km']!),
+                    _buildMeterCell("TOTAL KM", "${totalKm.toStringAsFixed(2)} KM",
+                        isHighlight: true),
+                    if (invoiceData['trip_type'] == 'Round-Trip')
+                      _buildMeterCell("DAYS", "$totalDays Days"),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
 
-        if (invoiceData['trip_type'] == 'Local-Duty' ||
-            invoiceData['trip_type'] == 'Round-Trip') ...[
-          _buildTableRow('Starting Km ', invoiceData['starting_km']!, ''),
-          _buildTableRow('Ending Km ', invoiceData['closing_km']!, ''),
-          _buildTableRow('Total Km', totalKm.toStringAsFixed(2), ''),
-        ],
-        if (invoiceData['trip_type'] == 'Local-Duty') ...[
-          _buildTableRow(
-              'Package',
-              '${invoiceData['packageHours'].toString()} Hours - ${invoiceData['packageKm'].toString()} Km',
-              '$packageBaseWithCommission'),
-          _buildTableRow(
-              'Extra Km',
-              'Rs ${invoiceData['extra_km_price']} *  $extraKm Km ',
-              '$extrakmAmount'),
-          _buildTableRow(
-              'Extra Hrs',
-              'Rs ${invoiceData['extra_hours_price']} * $extraHours Hrs',
-              '$extraHoursAmount'),
-        ],
-        if (invoiceData['trip_type'] == 'Round-Trip') ...[
-          _buildTableRow(
-              'Total Km charge', '$maxKm x $commissionFormulaText', '$baceAmount'),
-          _buildTableRow('Total Days', '$totalDays', ''),
+        // Modern Fare Breakdown Table
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(10),
+            ],
+            child: Table(
+              columnWidths: const {
+                0: FlexColumnWidth(5),
+                1: FlexColumnWidth(3),
+                2: FlexColumnWidth(2),
+              },
+              children: [
+                _buildModernTableRow(
+                    'DESCRIPTION', 'RATE / DETAILS', 'AMOUNT',
+                    isHeader: true),
+                if (invoiceData['trip_type'] == 'Local-Duty') ...[
+                  _buildModernTableRow(
+                    'Package',
+                    '${invoiceData['packageHours']} Hours - ${invoiceData['packageKm']} Km',
+                    '$packageBaseWithCommission',
+                  ),
+                  _buildModernTableRow(
+                    'Extra Km',
+                    'Rs ${invoiceData['extra_km_price']} * $extraKm Km',
+                    '$extrakmAmount',
+                    isAlt: true,
+                  ),
+                  _buildModernTableRow(
+                    'Extra Hrs',
+                    'Rs ${invoiceData['extra_hours_price']} * $extraHours Hrs',
+                    '$extraHoursAmount',
+                  ),
+                ],
+                if (invoiceData['trip_type'] == 'Round-Trip') ...[
+                  _buildModernTableRow(
+                    'Total Km charge',
+                    '$maxKm x $commissionFormulaText',
+                    '$baceAmount',
+                  ),
+                  _buildModernTableRow('Total Days', '$totalDays Days', '',
+                      isAlt: true),
+                ],
+                _buildModernTableRow('Parking', '', '$parking_charge'),
+                if (invoiceData['trip_type'] != 'One-way') ...[
+                  _buildModernTableRow('Toll', '', '$toll_charge',
+                      isAlt: true),
+                  _buildModernTableRow('Permit Charge', '', '$permit_charge'),
+                ],
+                _buildModernTableRow(
+                    'Driver Allowance', '', '${driver_allowance ?? ""} ',
+                    isAlt: true),
+                if (invoiceData['trip_type'] == 'One-way') ...[
+                  _buildModernTableRow(
+                      'Base Amount', '', '${baceAmount!.toStringAsFixed(2)}'),
+                  _buildModernTableRow('Total Charge', '',
+                      '${(baceAmount! + parking_charge!).toStringAsFixed(2)}',
+                      isAlt: true),
+                ],
+                if (invoiceData['trip_type'] != 'Local-taxi') ...[
+                  if (isIntraState) ...[
+                    _buildModernTableRow(
+                        'CGST ${(gstPercent / 2).toStringAsFixed(1)}%',
+                        '',
+                        '${(gst! / 2).toStringAsFixed(2)}'),
+                    _buildModernTableRow(
+                        'SGST ${(gstPercent / 2).toStringAsFixed(1)}%',
+                        '',
+                        '${(gst! / 2).toStringAsFixed(2)}',
+                        isAlt: true),
+                  ] else ...[
+                    _buildModernTableRow('IGST ${gstPercent.toStringAsFixed(1)}%',
+                        '', '${gst!.toStringAsFixed(2)}'),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Total & Payment Summary Card
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E3A8A),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "TOTAL FARE",
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      "₹$netTotal",
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("Advance Amount",
+                      style: GoogleFonts.poppins(
+                          fontSize: 13, color: const Color(0xFF475569))),
+                  Text("₹${advancedAmount.toStringAsFixed(2)}",
+                      style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF059669))),
+                ],
+              ),
+              const Divider(height: 16, color: Color(0xFFE2E8F0)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("Balance Amount",
+                      style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF0F172A))),
+                  Text("₹${balanceAmount.toStringAsFixed(2)}",
+                      style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: balanceAmount > 0
+                              ? const Color(0xFFDC2626)
+                              : const Color(0xFF0F172A))),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Agent Commission Note
+        if (userType == 'agent') ...[
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline,
+                    size: 16, color: Color(0xFF1E3A8A)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "Agent Commission is included in the above amount",
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF1E3A8A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
         ],
 
-        _buildTableRow('Parking', '', '$parking_charge'),
-        if (invoiceData['trip_type'] != 'One-way') ...[
-          _buildTableRow('Toll', '', '$toll_charge'),
-          _buildTableRow('Permit Charge', '', '$permit_charge'),
+        // Bank Details Card (if not agent)
+        if (!_isAgentInvoice) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("BANK PAYMENT DETAILS",
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                        color: const Color(0xFF1E3A8A))),
+                const SizedBox(height: 4),
+                Text("Bank: Federal Bank  |  A/c: RENTOX CAR",
+                    style: GoogleFonts.poppins(
+                        fontSize: 11, color: const Color(0xFF334155))),
+                Text("A/c No: 15390200008421  |  IFSC: FDRL0001539",
+                    style: GoogleFonts.poppins(
+                        fontSize: 11, color: const Color(0xFF334155))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
         ],
-        _buildTableRow('Driver Allowance', '', '${driver_allowance ?? ""} '),
 
-        if (invoiceData['trip_type'] == 'One-way') ...[
-          _buildTableRow('Base Amount', '', '${baceAmount!.toStringAsFixed(2)}'),
-          _buildTableRow('Total Charge', '', '${(baceAmount! + parking_charge!).toStringAsFixed(2)}'),
-        ],
-
-        if (invoiceData['trip_type'] != 'Local-taxi') ...[
-          if (isIntraState) ...[
-            _buildTableRow('CGST ${(gstPercent / 2).toStringAsFixed(1)}%', '', '${(gst! / 2).toStringAsFixed(2)}'),
-            _buildTableRow('SGST ${(gstPercent / 2).toStringAsFixed(1)}%', '', '${(gst! / 2).toStringAsFixed(2)}'),
-          ] else ...[
-            _buildTableRow('IGST ${gstPercent.toStringAsFixed(1)}%', '', '${gst!.toStringAsFixed(2)}'),
-          ],
-        ],
-
-        _buildTableRow('TOTAL', '', '$netTotal'),
-        _buildTableRow('Advanced Amount', '', '${advancedAmount.toStringAsFixed(2)}'),
-        _buildTableRow('Balance Amount', '', '${balanceAmount.toStringAsFixed(2)}'),
-
-        //   _buildTableRow('IGST 5%', '', '₹${igst.toStringAsFixed(2)}'),
-        //   _buildTableRow('Total', '', '₹${totalAmt.toStringAsFixed(2)}'),
+        // Signatory & Footer note
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  !_isAgentInvoice
+                      ? "Kindly issue a crossed cheque in favour of AGNI CAR RENTAL \"Subject To Mumbai Jurisdiction\""
+                      : "Thank you for choosing $_agentHeaderName",
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                children: [
+                  Container(width: 100, height: 1, color: const Color(0xFF94A3B8)),
+                  const SizedBox(height: 4),
+                  Text("Authorized Sign.",
+                      style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF334155))),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
       ],
     );
   }
 
-  TableRow _buildTableRow(String col1, String col2, String col3) {
+  Widget _buildMeterCell(String label, String value, {bool isHighlight = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: GoogleFonts.poppins(
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF64748B))),
+        Text(value,
+            style: GoogleFonts.poppins(
+                fontSize: 11,
+                fontWeight: isHighlight ? FontWeight.bold : FontWeight.w600,
+                color: isHighlight
+                    ? const Color(0xFF1E3A8A)
+                    : const Color(0xFF0F172A))),
+      ],
+    );
+  }
+
+  TableRow _buildModernTableRow(
+    String col1,
+    String col2,
+    String col3, {
+    bool isHeader = false,
+    bool isAlt = false,
+    bool isTotal = false,
+  }) {
+    final bgColor = isHeader
+        ? const Color(0xFF1E3A8A)
+        : isTotal
+            ? const Color(0xFFF1F5F9)
+            : isAlt
+                ? const Color(0xFFF8FAFC)
+                : Colors.white;
+
+    final textColor = isHeader
+        ? Colors.white
+        : isTotal
+            ? const Color(0xFF0F172A)
+            : const Color(0xFF1E293B);
+
+    final textWeight =
+        (isHeader || isTotal) ? FontWeight.bold : FontWeight.normal;
+    final fontSize = isHeader ? 11.5 : (isTotal ? 12.5 : 11.5);
+
     return TableRow(
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(
+          bottom: BorderSide(
+            color: isHeader
+                ? const Color(0xFF1E3A8A)
+                : const Color(0xFFE2E8F0),
+            width: isTotal ? 1.5 : 0.6,
+          ),
+        ),
+      ),
       children: [
         Padding(
-            padding: EdgeInsets.all(4.0),
-            child: Text(col1,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Text(
+            col1,
+            style: GoogleFonts.poppins(
+              fontWeight: (col1 == 'TOTAL' || isHeader)
+                  ? FontWeight.bold
+                  : textWeight,
+              fontSize: fontSize,
+              color: textColor,
+            ),
+          ),
+        ),
         Padding(
-            padding: EdgeInsets.all(4.0),
-            child: Text(col2, style: TextStyle(fontSize: 12))),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Text(
+            col2,
+            style: GoogleFonts.poppins(
+              fontWeight: textWeight,
+              fontSize: fontSize,
+              color: isHeader ? Colors.white : const Color(0xFF475569),
+            ),
+          ),
+        ),
         Padding(
-            padding: EdgeInsets.all(4.0),
-            child: Text(col3, style: TextStyle(fontSize: 12))),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              col3.isNotEmpty
+                  ? (col3.startsWith('Rs') ||
+                          col3.startsWith('₹') ||
+                          col3 == 'TOTAL' ||
+                          isHeader
+                      ? col3
+                      : '₹$col3')
+                  : '',
+              style: GoogleFonts.poppins(
+                fontWeight: (col1 == 'TOTAL' || isHeader)
+                    ? FontWeight.bold
+                    : (isTotal ? FontWeight.bold : FontWeight.w600),
+                fontSize: fontSize,
+                color: isHeader
+                    ? Colors.white
+                    : (col1 == 'TOTAL'
+                        ? const Color(0xFF1E3A8A)
+                        : textColor),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
