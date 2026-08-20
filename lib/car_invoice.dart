@@ -553,7 +553,6 @@ class _InvoicePageState extends State<InvoicePage> {
                   ],
 
                   if (invoiceData['trip_type'] != 'Local-taxi') ...[
-                    _buildPdfTableRow('GSTIN', '27AABPG5706A3ZB', ''),
                     if (isIntraState) ...[
                       _buildPdfTableRow('CGST ${(gstPercent / 2).toStringAsFixed(1)}%', '', '${(gst! / 2).toStringAsFixed(2)}'),
                       _buildPdfTableRow('SGST ${(gstPercent / 2).toStringAsFixed(1)}%', '', '${(gst! / 2).toStringAsFixed(2)}'),
@@ -1030,7 +1029,6 @@ class _InvoicePageState extends State<InvoicePage> {
         ],
 
         if (invoiceData['trip_type'] != 'Local-taxi') ...[
-          _buildTableRow('GSTIN', '27AABPG5706A3ZB', ''),
           if (isIntraState) ...[
             _buildTableRow('CGST ${(gstPercent / 2).toStringAsFixed(1)}%', '', '${(gst! / 2).toStringAsFixed(2)}'),
             _buildTableRow('SGST ${(gstPercent / 2).toStringAsFixed(1)}%', '', '${(gst! / 2).toStringAsFixed(2)}'),
