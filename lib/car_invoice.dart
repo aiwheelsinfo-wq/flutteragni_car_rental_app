@@ -1071,10 +1071,10 @@ class _InvoicePageState extends State<InvoicePage> {
                           isAlt: true),
                       _buildModernPdfTableRow(
                           'Permit Charge', '', '$permit_charge'),
+                      _buildModernPdfTableRow(
+                          'Driver Allowance', '', '${driver_allowance ?? ""} ',
+                          isAlt: true),
                     ],
-                    _buildModernPdfTableRow(
-                        'Driver Allowance', '', '${driver_allowance ?? ""} ',
-                        isAlt: true),
                     if (invoiceData['trip_type'] == 'One-way') ...[
                       _buildModernPdfTableRow(
                           'Base Amount', '', '$baceAmount'),
@@ -1986,10 +1986,10 @@ class _InvoicePageState extends State<InvoicePage> {
                   _buildModernTableRow('Toll', '', '$toll_charge',
                       isAlt: true),
                   _buildModernTableRow('Permit Charge', '', '$permit_charge'),
+                  _buildModernTableRow(
+                      'Driver Allowance', '', '${driver_allowance ?? ""} ',
+                      isAlt: true),
                 ],
-                _buildModernTableRow(
-                    'Driver Allowance', '', '${driver_allowance ?? ""} ',
-                    isAlt: true),
                 if (invoiceData['trip_type'] == 'One-way') ...[
                   _buildModernTableRow(
                       'Base Amount', '', '$baceAmount'),
