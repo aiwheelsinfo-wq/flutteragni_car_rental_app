@@ -1222,7 +1222,9 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                     double toll = double.tryParse(booking['toll_charge']?.toString() ?? '0') ?? 0.0;
                     double permit = double.tryParse(booking['permit_charge']?.toString() ?? '0') ?? 0.0;
                     double driverAllowancePerDay = double.tryParse(booking['driver_allowance']?.toString() ?? '0') ?? 0.0;
-                    double totalDriverAllowance = driverAllowancePerDay * days;
+                    String tripTimeStr = (booking['time'] ?? booking['starting_time'] ?? '').toString();
+                    bool isEarlyMorning = _isEarlyMorningTime(tripTimeStr);
+                    double totalDriverAllowance = (driverAllowancePerDay * days) + (isEarlyMorning ? 300.0 : 0.0);
 
                     double netTotal = baseAmount + gst + parking + toll + permit + totalDriverAllowance;
                     double remaining = netTotal - advancePaid;
@@ -3061,5 +3063,32 @@ Thank you for choosing Rentox system!
         ],
       ),
     );
+  }
+
+  bool _isEarlyMorningTime(String timeStr) {
+    if (timeStr.isEmpty) return false;
+    try {
+      final clean = timeStr.trim().toUpperCase();
+      int hour = -1;
+      int minute = 0;
+      if (clean.contains('AM') || clean.contains('PM')) {
+        final parts =
+            clean.replaceAll('AM', '').replaceAll('PM', '').trim().split(':');
+        hour = int.parse(parts[0]);
+        if (parts.length > 1) minute = int.parse(parts[1]);
+        if (clean.contains('AM')) {
+          if (hour == 12) hour = 0;
+        } else if (clean.contains('PM')) {
+          if (hour != 12) hour += 12;
+        }
+      } else {
+        final parts = clean.split(':');
+        hour = int.parse(parts[0]);
+        if (parts.length > 1) minute = int.parse(parts[1]);
+      }
+      return (hour >= 1 && hour < 6) || (hour == 6 && minute == 0);
+    } catch (_) {
+      return false;
+    }
   }
 }
