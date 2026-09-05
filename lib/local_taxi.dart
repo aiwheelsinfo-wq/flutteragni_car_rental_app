@@ -46,6 +46,8 @@ class _LocalTaxiState extends State<LocalTaxi> {
 
   List<Map<String, dynamic>> carFares = [];
   double? kmLimit;
+  double? currentCalculatedDistance;
+  String tripDuration = "";
 
   final FlutterSecureStorage secureStorage = FlutterSecureStorage();
   String fullAddress = "";
@@ -228,11 +230,27 @@ class _LocalTaxiState extends State<LocalTaxi> {
 
       double distanceInKm = (route["distanceMeters"] ?? 0) / 1000;
 
+      String durationText = "";
+      if (route["duration"] != null) {
+        String durRaw = route["duration"].toString().replaceAll("s", "");
+        int totalSecs = int.tryParse(durRaw) ?? 0;
+        int mins = (totalSecs / 60).round();
+        if (mins >= 60) {
+          int hrs = mins ~/ 60;
+          int remainingMins = mins % 60;
+          durationText = remainingMins > 0 ? "$hrs hr $remainingMins min" : "$hrs hr";
+        } else if (mins > 0) {
+          durationText = "$mins mins";
+        }
+      }
+
       String encodedPolyline = route["polyline"]?["encodedPolyline"] ?? "";
 
       List<LatLng> points = _decodePolyline(encodedPolyline);
 
       setState(() {
+        currentCalculatedDistance = distanceInKm;
+        tripDuration = durationText;
         distanceController.text = "${distanceInKm.toStringAsFixed(1)} km";
         serviceAvailable = distanceInKm <= 80;
         showCarSection = true;
@@ -305,47 +323,86 @@ class _LocalTaxiState extends State<LocalTaxi> {
   }
 
   Future<void> _fetchAndCompareFares(double distance) async {
+    setState(() => showLoading = true);
     try {
-      String? savedNumber = await secureStorage.read(key: 'phone_number');
-      if (savedNumber == null) return;
+      final now = DateTime.now();
+      final timeStr =
+          "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+      final uri = Uri.parse(
+          "${ApiConfig.baseUrl}/selectCarCostList.php?tripType=Local%20Taxi&distance=${distance.toStringAsFixed(2)}&pickupTime=$timeStr");
 
-      final response = await http.get(Uri.parse(
-          "${ApiConfig.baseUrl}/agni_taxi/fetch_fares.php?phone_number=$savedNumber"));
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
-        List fares = json.decode(response.body);
-        Map<String, dynamic>? selectedFare;
-        for (var fare in fares) {
-          kmLimit = double.tryParse(fare["km"].toString()) ?? 0;
-          if (distance <= kmLimit!) {
-            selectedFare = fare;
-            break;
-          }
-        }
-        selectedFare ??= fares.last;
+        final dynamic decoded = json.decode(response.body);
+        if (decoded is List) {
+          List<Map<String, dynamic>> parsedFares = [];
+          for (var item in decoded) {
+            final carType = item['carType']?.toString() ?? '';
+            final discountedPrice =
+                double.tryParse(item['discounted_price']?.toString() ?? '0') ??
+                    0.0;
+            final baseAmount =
+                double.tryParse(item['baseAmount']?.toString() ?? '0') ??
+                    discountedPrice;
+            final discountPct = item['discount_percentage'] ?? 0;
+            final kmRate = item['kmRate']?.toString() ?? '';
+            final gstPercent = item['gstPercent']?.toString() ?? '5';
 
-        setState(() {
-          carFares = [
-            _mapFare(selectedFare!, "Hatchback"),
-            _mapFare(selectedFare, "Sedan"),
-            _mapFare(selectedFare, "Ertiga"),
-          ];
-        });
+            final timeSurcharges =
+                item['time_surcharges'] as Map<String, dynamic>?;
+            final appliedLabels =
+                (timeSurcharges?['applied_labels'] as List<dynamic>?) ?? [];
+            String surgeTag = "";
+            if (appliedLabels.isNotEmpty) {
+              surgeTag = appliedLabels.first.toString();
+            } else if (timeSurcharges?['is_peak'] == true) {
+              surgeTag = "Peak Rush";
+            } else if (timeSurcharges?['is_night'] == true) {
+              surgeTag = "Night Surge";
+            }
+
+            parsedFares.add({
+              "car_type": carType,
+              "original_price": baseAmount,
+              "discounted_price": discountedPrice,
+              "discount_percent": discountPct,
+              "surge_tag": surgeTag,
+              "km_rate": kmRate,
+              "gst_percent": gstPercent,
+            });
+          }
+
+          setState(() {
+            carFares = parsedFares;
+            currentCalculatedDistance = distance;
+            if (parsedFares.isNotEmpty &&
+                (selectedCar.isEmpty ||
+                    !parsedFares.any((c) => c["car_type"] == selectedCar))) {
+              selectedCar = parsedFares.first["car_type"];
+            }
+          });
+        }
       }
     } catch (e) {
-      debugPrint(e.toString());
+      debugPrint("Dynamic Local Taxi fare fetch error: $e");
+    } finally {
+      if (mounted) {
+        setState(() => showLoading = false);
+      }
     }
   }
 
-  Map<String, dynamic> _mapFare(Map<String, dynamic> data, String type) {
-    return {
-      "car_type": type,
-      "original_price": double.tryParse(data[type].toString()) ?? 0,
-      "discounted_price":
-          double.tryParse(data["${type}_discounted"].toString()) ??
-              double.tryParse(data[type].toString()) ??
-              0,
-      "discount_percent": data["discount_percent"] ?? 0,
-    };
+  IconData _getCarIcon(String carType) {
+    final lower = carType.toLowerCase();
+    if (lower.contains('sedan')) {
+      return Icons.directions_car;
+    } else if (lower.contains('suv') ||
+        lower.contains('crysta') ||
+        lower.contains('innova') ||
+        lower.contains('ertiga')) {
+      return Icons.airport_shuttle;
+    }
+    return Icons.directions_car_outlined;
   }
 
   final String yellowMapStyle = '''
@@ -527,7 +584,14 @@ class _LocalTaxiState extends State<LocalTaxi> {
       return;
     }
 
-    var fareData = carFares.firstWhere((f) => f["car_type"] == selectedCar);
+    var fareData = carFares.firstWhere(
+      (f) => f["car_type"] == selectedCar,
+      orElse: () => carFares.isNotEmpty ? carFares.first : <String, dynamic>{},
+    );
+
+    double finalAmount =
+        (fareData["discounted_price"] as num?)?.toDouble() ?? 0.0;
+    double tripDistance = currentCalculatedDistance ?? (kmLimit ?? 0.0);
 
     Navigator.push(
       context,
@@ -537,8 +601,8 @@ class _LocalTaxiState extends State<LocalTaxi> {
             "from_address": fullAddress,
             "to_address": toController.text,
             "car_type": selectedCar,
-            "total_amount": fareData["discounted_price"].toString(),
-            "distance": kmLimit,
+            "total_amount": finalAmount.toStringAsFixed(0),
+            "distance": tripDistance.toStringAsFixed(1),
             "from_lat": fromLatLng?.latitude.toString() ?? "",
             "from_lng": fromLatLng?.longitude.toString() ?? "",
             "to_lat": toLatLng?.latitude.toString() ?? "",
@@ -651,6 +715,32 @@ class _LocalTaxiState extends State<LocalTaxi> {
                 toLatLng = LatLng(lat, lng);
                 _calculateDistance();
               }),
+          if (distanceController.text.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F7F7),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.straighten_rounded, size: 14, color: Colors.black54),
+                  const SizedBox(width: 5),
+                  Text(
+                    "Distance: ${distanceController.text}${tripDuration.isNotEmpty ? '  •  $tripDuration' : ''}",
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -738,53 +828,272 @@ class _LocalTaxiState extends State<LocalTaxi> {
   }
 
   Widget _buildCarSelection() {
+    if (carFares.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          children: [
+            const Icon(Icons.no_crash_outlined, size: 40, color: Colors.grey),
+            const SizedBox(height: 8),
+            Text(
+              "No vehicles available for this route.",
+              style: GoogleFonts.poppins(color: Colors.grey, fontSize: 13),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                "Available Rides",
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: Colors.black87,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: primaryAmber.withOpacity(0.5), width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.route_rounded, size: 13, color: Colors.amber.shade900),
+                    const SizedBox(width: 4),
+                    Text(
+                      distanceController.text.isNotEmpty
+                          ? distanceController.text
+                          : "${(currentCalculatedDistance ?? 0.0).toStringAsFixed(1)} km",
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                    if (tripDuration.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        "• $tripDuration",
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                          color: Colors.amber.shade800,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         SizedBox(
-          height: 160,
+          height: 185,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: carFares.length,
             itemBuilder: (context, index) {
               var car = carFares[index];
               bool isSelected = selectedCar == car["car_type"];
+              String surgeTag = car["surge_tag"]?.toString() ?? "";
+              double origPrice =
+                  (car["original_price"] as num?)?.toDouble() ?? 0.0;
+              double discPrice =
+                  (car["discounted_price"] as num?)?.toDouble() ?? 0.0;
+
+              // Dynamic discount calculations
+              bool hasDiscount = origPrice > discPrice && origPrice > 0;
+              double discountAmount = hasDiscount ? (origPrice - discPrice) : 0.0;
+              int discountPercent = hasDiscount
+                  ? (((origPrice - discPrice) / origPrice) * 100).round()
+                  : 0;
+
               return GestureDetector(
                 onTap: () => setState(() => selectedCar = car["car_type"]),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  width: 130,
-                  margin: const EdgeInsets.only(right: 15, bottom: 10, top: 10),
-                  padding: const EdgeInsets.all(12),
+                  width: 140,
+                  margin: const EdgeInsets.only(right: 12, bottom: 6, top: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   decoration: BoxDecoration(
                     color: isSelected ? primaryAmber : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                        color: isSelected ? primaryAmber : Colors.grey.shade300,
+                        color:
+                            isSelected ? primaryAmber : Colors.grey.shade300,
                         width: 2),
                     boxShadow: isSelected
                         ? [
                             BoxShadow(
-                                color: primaryAmber.withOpacity(0.4),
+                                color: primaryAmber.withOpacity(0.35),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4))
                           ]
-                        : [],
+                        : [
+                            BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2))
+                          ],
                   ),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(Icons.directions_car,
-                          size: 40,
-                          color: isSelected ? Colors.white : Colors.black54),
-                      const SizedBox(height: 8),
-                      Text(car["car_type"],
-                          style: GoogleFonts.poppins(
+                      // Top indicator: Surge tag (if present)
+                      if (surgeTag.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.black.withOpacity(0.18)
+                                : Colors.orange.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            surgeTag.contains('+')
+                                ? "⚡ ${surgeTag.split('(').last.replaceAll(')', '')}"
+                                : "⚡ Surge",
+                            style: GoogleFonts.poppins(
+                              fontSize: 8.5,
                               fontWeight: FontWeight.bold,
-                              color: isSelected ? Colors.white : Colors.black)),
-                      Text("₹${car["discounted_price"].toStringAsFixed(0)}",
-                          style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w600,
-                              color: isSelected ? Colors.white : primaryAmber)),
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.orange.shade900,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        )
+                      else
+                        const SizedBox(height: 4),
+
+                      // Vehicle Icon
+                      Icon(
+                        _getCarIcon(car["car_type"] ?? ""),
+                        size: 34,
+                        color: isSelected ? Colors.white : Colors.black87,
+                      ),
+
+                      // Vehicle Name
+                      Text(
+                        car["car_type"] ?? "",
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: isSelected ? Colors.white : Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+
+                      // Pricing & Discount Section
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (hasDiscount) ...[
+                            // 1. SAVE BADGE (Rentox yellow/orange theme, highly readable on selected card)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.white
+                                    : const Color(0xFFFFF3CD),
+                                borderRadius: BorderRadius.circular(6),
+                                border: isSelected
+                                    ? null
+                                    : Border.all(
+                                        color: const Color(0xFFFFB300),
+                                        width: 0.8),
+                              ),
+                              child: Text(
+                                "SAVE $discountPercent%",
+                                style: GoogleFonts.poppins(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.3,
+                                  color: isSelected
+                                      ? const Color(0xFFD97706)
+                                      : const Color(0xFFB45309),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+
+                            // 2. STRIKETHROUGH ORIGINAL PRICE & PROMINENT FINAL PRICE
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
+                                Text(
+                                  "₹${origPrice.toStringAsFixed(0)}",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 11.5,
+                                    decoration: TextDecoration.lineThrough,
+                                    fontWeight: FontWeight.w500,
+                                    color: isSelected
+                                        ? Colors.white.withOpacity(0.75)
+                                        : const Color(0xFF94A3B8),
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  "₹${discPrice.toStringAsFixed(0)}",
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16.5,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            // 3. YOU SAVE AMOUNT
+                            Text(
+                              "You save ₹${discountAmount.toStringAsFixed(0)}",
+                              style: GoogleFonts.poppins(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white.withOpacity(0.95)
+                                    : const Color(0xFF15803D),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ] else ...[
+                            // NO DISCOUNT: Only current fare, no fake crossed-out price or badges
+                            Text(
+                              "₹${discPrice.toStringAsFixed(0)}",
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                                color: isSelected
+                                    ? Colors.white
+                                    : const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                 ),
