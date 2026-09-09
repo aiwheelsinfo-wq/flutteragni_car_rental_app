@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:agni_car_rental/config/api_config.dart';
 import 'package:agni_car_rental/agent_page.dart';
 import 'package:agni_car_rental/AgentEarningsPage.dart';
+import 'package:agni_car_rental/CustomerSupportChatPage.dart';
 
 class UserProfilePage extends StatefulWidget {
   @override
@@ -284,6 +285,72 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   ),
                 ),
               ],
+              const SizedBox(height: 16),
+              // Customer Care & Live Support
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CustomerSupportChatPage(
+                        initialPhone: user?['phone_number']?.toString(),
+                        initialName: user?['name']?.toString(),
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFFF8F00).withOpacity(0.3), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF8F00).withOpacity(0.06),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF3E0),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.headset_mic_rounded, color: Color(0xFFFF8F00), size: 20),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "24/7 Customer Care & Support",
+                              style: GoogleFonts.poppins(
+                                color: const Color(0xFF1E232F),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              "Chat live with our travel support desk",
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: Color(0xFFFF8F00)),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
               GestureDetector(
                 onTap: () => _showLogoutDialog(theme),
