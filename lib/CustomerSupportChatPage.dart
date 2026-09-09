@@ -20,7 +20,7 @@ class _CustomerSupportChatPageState extends State<CustomerSupportChatPage> {
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   final TextEditingController _messageController = TextEditingController();
-  final ScrollController _scrollController = TextEditingController() as ScrollController? ?? ScrollController();
+  final ScrollController _scrollController = ScrollController();
 
   String? _customerPhone;
   String? _customerName;
