@@ -399,7 +399,7 @@ class _CustomerSupportChatPageState extends State<CustomerSupportChatPage> {
                               itemCount: _messages.length,
                               itemBuilder: (context, index) {
                                 final msg = _messages[index];
-                                final isMe = msg['sender_type'] == 'customer';
+                                final isMe = msg['sender_type'] != 'admin';
                                 final timeStr = (msg['created_at'] ?? '').toString();
                                 final displayTime = timeStr.contains(' ')
                                     ? timeStr.split(' ')[1].substring(0, 5)
