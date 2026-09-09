@@ -561,17 +561,20 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Top bar: logo + support & location badges
+                      // Top bar: logo + location badge + circular support button
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Image.asset('assets/home.png', height: 30),
+                          Flexible(
+                            child: Image.asset('assets/home.png', height: 28, fit: BoxFit.contain),
+                          ),
+                          const SizedBox(width: 8),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              _buildSupportBadge(),
-                              const SizedBox(width: 8),
                               _buildLocationBadge(),
+                              const SizedBox(width: 8),
+                              _buildSupportBadge(),
                             ],
                           ),
                         ],
@@ -890,33 +893,20 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
         );
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        width: 34,
+        height: 34,
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.22),
-          borderRadius: BorderRadius.circular(20),
+          shape: BoxShape.circle,
           border: Border.all(
             color: Colors.white.withValues(alpha: 0.5),
             width: 1,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.headset_mic_rounded,
-              size: 13,
-              color: Colors.white,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'Support',
-              style: GoogleFonts.poppins(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ],
+        child: const Icon(
+          Icons.headset_mic_rounded,
+          size: 17,
+          color: Colors.white,
         ),
       ),
     );
@@ -925,51 +915,51 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
   Widget _buildLocationBadge() {
     if (_isCheckingLocation) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.25),
+          color: Colors.white.withValues(alpha: 0.25),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(
-              width: 10,
-              height: 10,
+              width: 9,
+              height: 9,
               child: CircularProgressIndicator(
                   strokeWidth: 1.5, color: Colors.white),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             Text('Locating...',
                 style: GoogleFonts.poppins(
-                    fontSize: 11, color: Colors.white)),
+                    fontSize: 10, color: Colors.white)),
           ],
         ),
       );
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(_isInsideBoundary ? 0.3 : 0.2),
+        color: Colors.white.withValues(alpha: _isInsideBoundary ? 0.3 : 0.2),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.white.withOpacity(0.5),
+          color: Colors.white.withValues(alpha: 0.5),
           width: 1,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          const Icon(
             Icons.location_on_rounded,
-            size: 12,
+            size: 11,
             color: Colors.white,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           Text(
-            _isInsideBoundary ? 'In Service Area' : 'Outside Area',
+            _isInsideBoundary ? 'In Service' : 'Outside',
             style: GoogleFonts.poppins(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w600,
               color: Colors.white,
             ),
