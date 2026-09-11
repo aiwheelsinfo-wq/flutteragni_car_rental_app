@@ -48,6 +48,7 @@ class _LocalTaxiState extends State<LocalTaxi> {
   double? kmLimit;
   double? currentCalculatedDistance;
   String tripDuration = "";
+  DateTime? selectedPickupDateTime;
 
   final FlutterSecureStorage secureStorage = FlutterSecureStorage();
   String fullAddress = "";
@@ -325,11 +326,13 @@ class _LocalTaxiState extends State<LocalTaxi> {
   Future<void> _fetchAndCompareFares(double distance) async {
     setState(() => showLoading = true);
     try {
-      final now = DateTime.now();
+      final targetDateTime = selectedPickupDateTime ?? DateTime.now();
       final timeStr =
-          "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+          "${targetDateTime.hour.toString().padLeft(2, '0')}:${targetDateTime.minute.toString().padLeft(2, '0')}";
+      final dateStr =
+          "${targetDateTime.year}-${targetDateTime.month.toString().padLeft(2, '0')}-${targetDateTime.day.toString().padLeft(2, '0')}";
       final uri = Uri.parse(
-          "${ApiConfig.baseUrl}/selectCarCostList.php?tripType=Local%20Taxi&distance=${distance.toStringAsFixed(2)}&pickupTime=$timeStr");
+          "${ApiConfig.baseUrl}/selectCarCostList.php?tripType=Local%20Taxi&distance=${distance.toStringAsFixed(2)}&pickupTime=$timeStr&pickupDate=$dateStr");
 
       final response = await http.get(uri).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
@@ -607,6 +610,16 @@ class _LocalTaxiState extends State<LocalTaxi> {
             "from_lng": fromLatLng?.longitude.toString() ?? "",
             "to_lat": toLatLng?.latitude.toString() ?? "",
             "to_lng": toLatLng?.longitude.toString() ?? "",
+            "pickup_time": selectedPickupDateTime != null
+                ? "${selectedPickupDateTime!.hour.toString().padLeft(2, '0')}:${selectedPickupDateTime!.minute.toString().padLeft(2, '0')}"
+                : "",
+            "pickup_date": selectedPickupDateTime != null
+                ? "${selectedPickupDateTime!.year}-${selectedPickupDateTime!.month.toString().padLeft(2, '0')}-${selectedPickupDateTime!.day.toString().padLeft(2, '0')}"
+                : "",
+            "is_scheduled": selectedPickupDateTime != null,
+            "scheduled_display": selectedPickupDateTime != null
+                ? _formatScheduledTime(selectedPickupDateTime!)
+                : "Leave Now",
           },
         ),
       ),
@@ -717,31 +730,210 @@ class _LocalTaxiState extends State<LocalTaxi> {
               }),
           if (distanceController.text.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF7F7F7),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.straighten_rounded, size: 14, color: Colors.black54),
-                  const SizedBox(width: 5),
-                  Text(
-                    "Distance: ${distanceController.text}${tripDuration.isNotEmpty ? '  •  $tripDuration' : ''}",
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF7F7F7),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.straighten_rounded, size: 14, color: Colors.black54),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            "Distance: ${distanceController.text}${tripDuration.isNotEmpty ? '  •  $tripDuration' : ''}",
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                _buildPickupTimeSelector(),
+              ],
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  String _formatScheduledTime(DateTime dt) {
+    final now = DateTime.now();
+    final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final tomorrow = now.add(const Duration(days: 1));
+    final isTomorrow = dt.year == tomorrow.year && dt.month == tomorrow.month && dt.day == tomorrow.day;
+
+    String dayPrefix = "";
+    if (isToday) {
+      dayPrefix = "Today";
+    } else if (isTomorrow) {
+      dayPrefix = "Tomorrow";
+    } else {
+      dayPrefix = "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}";
+    }
+
+    final hour = dt.hour;
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+
+    return "$dayPrefix, $displayHour:$minute $period";
+  }
+
+  Future<void> _pickPickupTime() async {
+    final now = DateTime.now();
+    final initialDate = selectedPickupDateTime ?? now;
+
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: now.add(const Duration(days: 30)),
+      helpText: "SELECT PICKUP DATE",
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: primaryAmber,
+              onPrimary: Colors.black,
+              onSurface: Colors.black87,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate == null) return;
+
+    final initialTime = selectedPickupDateTime != null
+        ? TimeOfDay(hour: selectedPickupDateTime!.hour, minute: selectedPickupDateTime!.minute)
+        : TimeOfDay.fromDateTime(now.add(const Duration(minutes: 15)));
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      helpText: "SELECT PICKUP TIME",
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: primaryAmber,
+              onPrimary: Colors.black,
+              onSurface: Colors.black87,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedTime == null) return;
+
+    final scheduled = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+
+    if (scheduled.isBefore(now.subtract(const Duration(minutes: 5)))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please select a future pickup time"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      selectedPickupDateTime = scheduled;
+    });
+
+    if (currentCalculatedDistance != null && serviceAvailable) {
+      _fetchAndCompareFares(currentCalculatedDistance!);
+    }
+  }
+
+  void _resetPickupTimeToNow() {
+    setState(() {
+      selectedPickupDateTime = null;
+    });
+    if (currentCalculatedDistance != null && serviceAvailable) {
+      _fetchAndCompareFares(currentCalculatedDistance!);
+    }
+  }
+
+  Widget _buildPickupTimeSelector() {
+    bool isScheduled = selectedPickupDateTime != null;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _pickPickupTime,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: isScheduled ? const Color(0xFFE8F5E9) : const Color(0xFFFFF8E1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isScheduled ? Colors.green.shade400 : primaryAmber.withOpacity(0.6),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isScheduled ? Icons.event_available_rounded : Icons.flash_on_rounded,
+                size: 14,
+                color: isScheduled ? Colors.green.shade800 : Colors.amber.shade900,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                isScheduled
+                    ? _formatScheduledTime(selectedPickupDateTime!)
+                    : "Leave Now",
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isScheduled ? Colors.green.shade800 : Colors.amber.shade900,
+                ),
+              ),
+              const SizedBox(width: 4),
+              if (isScheduled)
+                GestureDetector(
+                  onTap: _resetPickupTimeToNow,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade100,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.close, size: 11, color: Colors.red.shade800),
+                  ),
+                )
+              else
+                Icon(Icons.arrow_drop_down, size: 16, color: Colors.amber.shade900),
+            ],
+          ),
+        ),
       ),
     );
   }

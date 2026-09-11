@@ -9,14 +9,62 @@ import 'ShowBill.dart';
 // --- MODELS ---
 class Car {
   final String name;
-  final double price;
+  final double price; // kmRate
+  final double discountedPrice;
+  final double baseAmount;
+  final double discountPercentage;
+  final bool isDiscounted;
+  final double driverAllowance;
+  final double tollCharge;
+  final double gstPercent;
+  final int packageKm;
+  final double extraKmAmount;
+  final Map<String, dynamic>? dynamicPricing;
 
-  Car({required this.name, required this.price});
+  Car({
+    required this.name,
+    required this.price,
+    required this.discountedPrice,
+    required this.baseAmount,
+    required this.discountPercentage,
+    required this.isDiscounted,
+    required this.driverAllowance,
+    required this.tollCharge,
+    required this.gstPercent,
+    required this.packageKm,
+    required this.extraKmAmount,
+    this.dynamicPricing,
+  });
 
   factory Car.fromJson(Map<String, dynamic> json) {
+    final kmRate = double.tryParse(json['kmRate']?.toString() ?? '0') ?? 0.0;
+    final discPrice = double.tryParse(json['discounted_price']?.toString() ?? '0') ?? 0.0;
+    final baseAmt = double.tryParse(json['baseAmount']?.toString() ?? '0') ?? discPrice;
+    final discPct = double.tryParse(json['discount_percentage']?.toString() ?? '0') ?? 0.0;
+    final isDisc = json['is_discounted'] == 1 ||
+        json['is_discounted'] == true ||
+        (discPct > 0 && discPrice < baseAmt);
+    final drvTa = double.tryParse(json['driverAllowance']?.toString() ?? '0') ?? 0.0;
+    final toll = double.tryParse(json['tollCharge']?.toString() ?? '0') ?? 0.0;
+    final gst = double.tryParse(json['gstPercent']?.toString() ?? '5') ?? 5.0;
+    final pkgKm = int.tryParse(json['packageKm']?.toString() ?? '0') ?? 0;
+    final extraKm = double.tryParse(json['extraKMAmount']?.toString() ?? '0') ?? kmRate;
+
     return Car(
-      name: json['carType'],
-      price: double.tryParse(json['kmRate'].toString()) ?? 0.0,
+      name: json['carType']?.toString() ?? '',
+      price: kmRate,
+      discountedPrice: discPrice > 0 ? discPrice : baseAmt,
+      baseAmount: baseAmt > 0 ? baseAmt : discPrice,
+      discountPercentage: discPct,
+      isDiscounted: isDisc,
+      driverAllowance: drvTa,
+      tollCharge: toll,
+      gstPercent: gst,
+      packageKm: pkgKm,
+      extraKmAmount: extraKm,
+      dynamicPricing: json['dynamic_pricing'] is Map<String, dynamic>
+          ? json['dynamic_pricing']
+          : null,
     );
   }
 }
@@ -87,9 +135,9 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
 
   void _initializeAfterApiKey(
       double? fromLat, double? fromLng, double? toLat, double? toLng) {
-    _getDistanceFromGoogle(fromAddress, toAddress);
-    fetchCars(fromLat: fromLat, fromLng: fromLng, toLat: toLat, toLng: toLng);
     fetchDiscount();
+    _getDistanceFromGoogle(fromAddress, toAddress,
+        fromLat: fromLat, fromLng: fromLng, toLat: toLat, toLng: toLng);
   }
 
   Future<void> fetchApiKey() async {
@@ -107,9 +155,36 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
 
   Future<void> fetchCars(
       {double? fromLat, double? fromLng, double? toLat, double? toLng}) async {
+    setState(() => isLoading = true);
     try {
-      final uri = Uri.parse(
-          '${ApiConfig.baseUrl}/selectCarCostList.php?tripType=One-way&bookingId=$bookingId&fromLat=$fromLat&fromLng=$fromLng&toLat=$toLat&toLng=$toLng');
+      final Map<String, String> queryParams = {
+        'tripType': 'One-way',
+      };
+      if (bookingId != null && bookingId!.isNotEmpty) {
+        queryParams['bookingId'] = bookingId!;
+      }
+      if (numericDistance > 0 && numericDistance != 1) {
+        queryParams['distance'] = numericDistance.round().toString();
+      }
+      if (fromAddress.isNotEmpty) {
+        queryParams['fromAddress'] = fromAddress;
+      }
+      if (toAddress.isNotEmpty) {
+        queryParams['toAddress'] = toAddress;
+      }
+      if (date.isNotEmpty) {
+        queryParams['pickupDate'] = date;
+      }
+      if (time.isNotEmpty) {
+        queryParams['pickupTime'] = time;
+      }
+      if (fromLat != null) queryParams['fromLat'] = fromLat.toString();
+      if (fromLng != null) queryParams['fromLng'] = fromLng.toString();
+      if (toLat != null) queryParams['toLat'] = toLat.toString();
+      if (toLng != null) queryParams['toLng'] = toLng.toString();
+
+      final uri = Uri.parse('${ApiConfig.baseUrl}/selectCarCostList.php')
+          .replace(queryParameters: queryParams);
       final response = await http.get(uri);
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -117,8 +192,11 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
           cars = data.map((item) => Car.fromJson(item)).toList();
           isLoading = false;
         });
+      } else {
+        setState(() => isLoading = false);
       }
     } catch (e) {
+      debugPrint('fetchCars error: $e');
       setState(() => isLoading = false);
     }
   }
@@ -142,7 +220,8 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
     }
   }
 
-  Future<void> _getDistanceFromGoogle(String from, String to) async {
+  Future<void> _getDistanceFromGoogle(String from, String to,
+      {double? fromLat, double? fromLng, double? toLat, double? toLng}) async {
     userType = await storage.read(key: "userType");
     try {
       String encodedFrom = Uri.encodeComponent(from);
@@ -165,11 +244,13 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
           driverTa = ((numericDistance < 200) ? 300.0 : 400.0) + earlyMorningFee;
           tollCharge = numericDistance * 2.25;
           baseCharge = driverTa + tollCharge;
-          belowFifty = false;
+          belowFifty = numericDistance < 50;
         });
       }
     } catch (e) {
-      setState(() => numericDistance = 1);
+      debugPrint("Distance error: $e");
+    } finally {
+      fetchCars(fromLat: fromLat, fromLng: fromLng, toLat: toLat, toLng: toLng);
     }
   }
 
@@ -252,28 +333,23 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
                           car.name.toLowerCase() == "hatchback")
                         return const SizedBox.shrink();
 
-                      double standardPrice = (car.price * numericDistance * 1.05) +
-                          baseCharge +
-                          (commissionAmount * 1.05);
-                      double partPay = (car.price * numericDistance * 0.20) +
-                          (commissionAmount * 1.05);
-                      
-                      double savings = 0.0;
-                      if (discountValue > 0) {
-                        if (discountType == 'fixed') {
-                          savings = discountValue;
-                        } else {
-                          savings = standardPrice * (discountValue / 100);
-                        }
-                      }
-                      
-                      double totalPrice = (standardPrice - savings) < 0 ? 0.0 : (standardPrice - savings);
-                      double discountedPrice = standardPrice;
+                      // Dynamic backend fare matching web-rentox
+                      double carTripFare = car.discountedPrice > 0
+                          ? car.discountedPrice
+                          : ((car.price * numericDistance * 1.05) + baseCharge);
+                      double baselineFare = car.baseAmount > 0
+                          ? car.baseAmount
+                          : carTripFare;
+
+                      double commissionWithTax = commissionAmount * 1.05;
+                      double totalPrice = carTripFare + commissionWithTax;
+                      double baselinePrice = baselineFare + commissionWithTax;
+                      double partPay = totalPrice * 0.30;
 
                       return _buildModernCarCard(
                         car: car,
                         totalPrice: totalPrice,
-                        discountedPrice: discountedPrice,
+                        baselinePrice: baselinePrice,
                         partPay: partPay,
                       );
                     },
@@ -365,10 +441,11 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
   Widget _buildModernCarCard(
       {required Car car,
       required double totalPrice,
-      required double discountedPrice,
+      required double baselinePrice,
       required double partPay}) {
     final specs = _getCarSpecs(car.name);
-    final double savings = discountedPrice - totalPrice;
+    final double savings = baselinePrice - totalPrice;
+    final bool hasDiscount = (savings > 0) || car.isDiscounted || (car.discountPercentage > 0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
@@ -406,7 +483,7 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
             Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () => _navigateToShowBill(car.name, totalPrice, partPay),
+                onTap: () => _navigateToShowBill(car, totalPrice, partPay),
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
@@ -440,6 +517,10 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
                                     _specItem(Icons.luggage, specs['bags']),
                                     const SizedBox(width: 12),
                                     _specItem(Icons.ac_unit, "AC"),
+                                    if (car.packageKm > 0) ...[
+                                      const SizedBox(width: 12),
+                                      _specItem(Icons.route, "${car.packageKm} KM"),
+                                    ],
                                   ],
                                 ),
                               ],
@@ -463,9 +544,9 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
                                           fontSize: 22,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.green.shade700)),
-                                  if (savings > 0) ...[
+                                  if (hasDiscount && savings > 0) ...[
                                     const SizedBox(width: 8),
-                                    Text("₹${discountedPrice.toStringAsFixed(0)}",
+                                    Text("₹${baselinePrice.toStringAsFixed(0)}",
                                         style: const TextStyle(
                                             fontSize: 14,
                                             color: Colors.grey,
@@ -474,13 +555,9 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
                                   ],
                                 ],
                               ),
-                              Text("Inclusive of Driver TA & Tolls",
-                                  style: GoogleFonts.poppins(
-                                      fontSize: 10,
-                                      color: Colors.grey.shade500)),
                             ],
                           ),
-                          if (savings > 0)
+                          if (hasDiscount && savings > 0)
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 8),
@@ -528,9 +605,9 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
                                         ),
                                       ),
                                       Text(
-                                        discountType == 'fixed'
-                                            ? "$discountName ₹${discountValue.toStringAsFixed(0)} OFF"
-                                            : "$discountName ${discountValue.toStringAsFixed(0)}% OFF",
+                                        car.discountPercentage > 0
+                                            ? "SAVE ${car.discountPercentage.toStringAsFixed(0)}% OFF"
+                                            : "SPECIAL ONE-WAY RATE",
                                         style: GoogleFonts.poppins(
                                           color: const Color(0xFFFF6F00),
                                           fontSize: 8,
@@ -624,24 +701,25 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
     );
   }
 
-  void _navigateToShowBill(String carName, double totalPrice, double partPay) {
+  void _navigateToShowBill(Car car, double totalPrice, double partPay) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ShowBillPage(
           fromAddress: fromAddress,
           toAddress: toAddress,
-          carType: carName,
-          distance: numericDistance.toInt(),
-          baseCharge: baseCharge,
-          driverTa: driverTa,
-          tollCharge: tollCharge,
+          carType: car.name,
+          distance: car.packageKm > 0 ? car.packageKm : numericDistance.toInt(),
+          baseCharge: car.baseAmount > 0 ? car.baseAmount : baseCharge,
+          driverTa: car.driverAllowance > 0 ? car.driverAllowance : driverTa,
+          tollCharge: car.tollCharge > 0 ? car.tollCharge : tollCharge,
           totalAmount: totalPrice,
           date: date,
           tripTime: time,
           commission: commissionAmount,
           partPay: partPay,
           bookingId: bookingId ?? "",
+          discountedPrice: car.discountedPrice,
         ),
       ),
     );

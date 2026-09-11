@@ -105,6 +105,10 @@ class _CustomerRegistrationPageState extends State<CustomerRegistrationPage> {
         'from_lng': widget.bookingData?['from_lng'],
         'to_lat': widget.bookingData?['to_lat'],
         'to_lng': widget.bookingData?['to_lng'],
+        'pickup_time': widget.bookingData?['pickup_time'],
+        'pickup_date': widget.bookingData?['pickup_date'],
+        'time': widget.bookingData?['pickup_time'],
+        'date': widget.bookingData?['pickup_date'],
       };
 
       try {
@@ -339,24 +343,55 @@ class _CustomerRegistrationPageState extends State<CustomerRegistrationPage> {
                           fontWeight: FontWeight.bold,
                           fontSize: 16)),
                   const SizedBox(height: 4),
-                  // DISTANCE BADGE
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white10,
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.straighten,
-                            color: Colors.white70, size: 12),
-                        const SizedBox(width: 4),
-                        Text("$distance KM ",
-                            style: GoogleFonts.poppins(
-                                color: Colors.white70, fontSize: 10)),
-                      ],
-                    ),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white10,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.straighten,
+                                color: Colors.white70, size: 12),
+                            const SizedBox(width: 4),
+                            Text("$distance KM ",
+                                style: GoogleFonts.poppins(
+                                    color: Colors.white70, fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                      if (widget.bookingData?['is_scheduled'] == true &&
+                          (widget.bookingData?['scheduled_display']?.toString().isNotEmpty ?? false))
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.25),
+                            borderRadius: BorderRadius.circular(5),
+                            border: Border.all(
+                                color: Colors.green.shade400, width: 0.8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.schedule,
+                                  color: Colors.green.shade300, size: 12),
+                              const SizedBox(width: 4),
+                              Text(widget.bookingData!['scheduled_display'],
+                                  style: GoogleFonts.poppins(
+                                      color: Colors.green.shade300,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),

@@ -310,11 +310,13 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
       // ✅ Check boundary immediately
       if (fromLatLng != null && toLatLng != null) {
         final boundaryService = BoundaryService();
-        final Map<String, dynamic>? detectedCity = boundaryService.detectCity(fromLatLng!, fromController.text);
-        if (detectedCity != null) {
-          if (boundaryService.isPointInCity(toLatLng!, toController.text, detectedCity)) {
-            _showWithinCityBoundaryDialog(detectedCity["name"]);
-          }
+        final Map<String, dynamic>? detectedCity =
+            boundaryService.detectCity(fromLatLng!, fromController.text);
+        if (detectedCity == null) {
+          _showOutsideBoundaryDialog();
+        } else if (boundaryService.isPointInCity(toLatLng!, toController.text, detectedCity)) {
+          _showWithinCityBoundaryDialog(
+              detectedCity["name"] ?? detectedCity["city_name"] ?? "City");
         }
       }
     } catch (e) {
@@ -364,15 +366,28 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
   }
 
   void _handleProceed() {
-    if (fromLatLng != null && toLatLng != null) {
-      final boundaryService = BoundaryService();
-      final Map<String, dynamic>? detectedCity = boundaryService.detectCity(fromLatLng!, fromController.text);
-      if (detectedCity != null) {
-        if (boundaryService.isPointInCity(toLatLng!, toController.text, detectedCity)) {
-          _showWithinCityBoundaryDialog(detectedCity["name"]);
-          return;
-        }
-      }
+    if (fromLatLng == null || toLatLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select pickup and drop locations')),
+      );
+      return;
+    }
+
+    final boundaryService = BoundaryService();
+    final Map<String, dynamic>? detectedCity =
+        boundaryService.detectCity(fromLatLng!, fromController.text);
+
+    // 1. Block if pickup location is outside active service boundary
+    if (detectedCity == null) {
+      _showOutsideBoundaryDialog();
+      return;
+    }
+
+    // 2. Alert if both pickup & destination are inside the SAME city
+    if (boundaryService.isPointInCity(toLatLng!, toController.text, detectedCity)) {
+      _showWithinCityBoundaryDialog(
+          detectedCity["name"] ?? detectedCity["city_name"] ?? "City");
+      return;
     }
 
     Navigator.push(
@@ -383,6 +398,70 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
           to: toController.text,
         ),
       ),
+    );
+  }
+
+  void _showOutsideBoundaryDialog() {
+    final pickupName = fromController.text.split(',').first.trim().isNotEmpty
+        ? fromController.text.split(',').first.trim()
+        : "Selected location";
+    final boundaryService = BoundaryService();
+    final availableCities = boundaryService.getServicedCityNames();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.location_off_rounded, color: Colors.red, size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Outside Service Boundary",
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Pickup location "$pickupName" is outside Rentox\'s service boundary.\n\nCab pickups are currently available from: $availableCities.',
+            style: GoogleFonts.poppins(fontSize: 13, height: 1.45, color: charcoalDark),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: amberPrimary,
+                foregroundColor: charcoalDark,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(
+                "Change Pickup",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  isEditing = true;
+                });
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -610,6 +689,35 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
               ],
             ),
             const SizedBox(height: 25),
+
+            // Warning banner if pickup is outside boundary
+            if (fromLatLng != null &&
+                BoundaryService().detectCity(fromLatLng!, fromController.text) == null)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Pickup is outside service area (${BoundaryService().getServicedCityNames()})',
+                        style: GoogleFonts.poppins(
+                          color: Colors.red.shade800,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             // Logic for Local vs One-Way Buttons
             if (tripType == "Local")

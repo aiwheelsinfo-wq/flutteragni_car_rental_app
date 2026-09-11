@@ -20,6 +20,7 @@ class ShowBillPage extends StatefulWidget {
   final double commission;
   final double partPay;
   final String bookingId;
+  final double? discountedPrice;
 
   ShowBillPage({
     required this.carType,
@@ -35,6 +36,7 @@ class ShowBillPage extends StatefulWidget {
     required this.commission,
     required this.partPay,
     required this.bookingId,
+    this.discountedPrice,
   });
 
   @override
@@ -356,7 +358,7 @@ class _ShowBillPageState extends State<ShowBillPage> {
     double advanceAmount = baseTripFare * 0.25;
     double gstAmount = baseTripFare * 0.05;
     double payableNow = advanceAmount + gstAmount;
-    double remainingBalance = widget.totalAmount - payableNow;
+    double remainingBalance = widget.totalAmount - advanceAmount;
 
     return Container(
       decoration: BoxDecoration(
@@ -408,14 +410,18 @@ class _ShowBillPageState extends State<ShowBillPage> {
                 ),
                 const SizedBox(height: 20),
                 _buildFareRow("Base Fare",
-                    baseTripFare - widget.tollCharge - widget.driverTa),
-                _buildFareRow("Driver Allowance",
-                    _isEarlyMorningTime(widget.tripTime) && widget.driverTa >= 600
-                        ? (widget.driverTa - 300)
-                        : widget.driverTa),
+                    (baseTripFare - widget.tollCharge - widget.driverTa) > 0
+                        ? (baseTripFare - widget.tollCharge - widget.driverTa)
+                        : baseTripFare),
+                if (widget.driverTa > 0)
+                  _buildFareRow("Driver Allowance",
+                      _isEarlyMorningTime(widget.tripTime) && widget.driverTa >= 600
+                          ? (widget.driverTa - 300)
+                          : widget.driverTa),
                 if (_isEarlyMorningTime(widget.tripTime))
                   _buildFareRow("Early Morning Allowance (1AM-6AM)", 300),
-                _buildFareRow("Toll Charges (Included)", widget.tollCharge),
+                if (widget.tollCharge > 0)
+                  _buildFareRow("Toll Charges (Included)", widget.tollCharge),
                 if (widget.commission > 0)
                   _buildFareRow("Agent Commission", commissionWithTax),
                 const Divider(height: 30),
@@ -478,7 +484,7 @@ class _ShowBillPageState extends State<ShowBillPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: Text("Remaining Balance",
+                            child: Text("Remaining Balance (to Driver)",
                                 style: GoogleFonts.poppins(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,

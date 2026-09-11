@@ -7,8 +7,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart'; // Added for location detection
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:agni_car_rental/config/api_config.dart';
-import 'BookingCustomerMessagePage.dart';
+import 'services/boundary_service.dart';
 import 'RazorpayPaymentPage.dart';
 
 // --- MODELS ---
@@ -115,6 +116,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
     super.initState();
     fetchApiKey();
     fetchCars();
+    BoundaryService().fetchCityBoundaries();
     commissionController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -279,6 +281,22 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
         return;
       }
 
+      // Check operational boundary for Local Duty pickup
+      final double pLat = double.tryParse(lat) ?? 0.0;
+      final double pLng = double.tryParse(lng) ?? 0.0;
+      final boundaryService = BoundaryService();
+      await boundaryService.fetchCityBoundaries();
+      final detectedCity = boundaryService.detectCity(
+        LatLng(pLat, pLng),
+        locationController.text,
+      );
+
+      if (detectedCity == null) {
+        setState(() => isSubmitting = false);
+        _showOutsideBoundaryDialog();
+        return;
+      }
+
       String formattedTime = "";
       if (selectedTime != null) {
         formattedTime =
@@ -343,6 +361,65 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
     } finally {
       setState(() => isSubmitting = false);
     }
+  }
+
+  void _showOutsideBoundaryDialog() {
+    final pickupName = locationController.text.split(',').first.trim().isNotEmpty
+        ? locationController.text.split(',').first.trim()
+        : "Selected location";
+    final boundaryService = BoundaryService();
+    final availableCities = boundaryService.getServicedCityNames();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.location_off_rounded, color: Colors.red, size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Outside Service Boundary",
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Pickup location "$pickupName" is outside Rentox\'s service boundary.\n\nLocal Duty cabs are currently available within: $availableCities.',
+            style: GoogleFonts.poppins(fontSize: 13, height: 1.45, color: darkText),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryAmber,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(
+                "Change Pickup",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showSnack(String msg) {
@@ -424,6 +501,39 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
             onChanged: _getLocationSuggestions,
             decoration: _inputDecoration("Pickup Address", Icons.my_location),
           ),
+          if (fromLat != null &&
+              fromLng != null &&
+              BoundaryService().detectCity(
+                      LatLng(double.tryParse(fromLat!) ?? 0,
+                          double.tryParse(fromLng!) ?? 0),
+                      locationController.text) ==
+                  null)
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Colors.red, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Outside service boundary (${BoundaryService().getServicedCityNames()})',
+                      style: GoogleFonts.poppins(
+                        color: Colors.red.shade800,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if (predictions.isNotEmpty)
             ListView.builder(
               shrinkWrap: true,
@@ -433,12 +543,37 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
                 leading: const Icon(Icons.place, color: Colors.grey),
                 title: Text(predictions[index].description ?? '',
                     style: const TextStyle(fontSize: 13)),
-                onTap: () {
-                  locationController.text =
-                      predictions[index].description ?? '';
-                  selectedPlaceId = predictions[index].placeId;
+                onTap: () async {
+                  final desc = predictions[index].description ?? '';
+                  final placeId = predictions[index].placeId;
+                  locationController.text = desc;
+                  selectedPlaceId = placeId;
                   FocusScope.of(context).unfocus();
                   setState(() => predictions = []);
+
+                  if (placeId != null && apiKey.isNotEmpty) {
+                    try {
+                      _googlePlace = GooglePlace(apiKey);
+                      final details = await _googlePlace.details.get(placeId);
+                      final loc = details?.result?.geometry?.location;
+                      if (loc != null && loc.lat != null && loc.lng != null) {
+                        setState(() {
+                          fromLat = loc.lat.toString();
+                          fromLng = loc.lng.toString();
+                        });
+                        final boundaryService = BoundaryService();
+                        final detected = boundaryService.detectCity(
+                          LatLng(loc.lat!, loc.lng!),
+                          desc,
+                        );
+                        if (detected == null) {
+                          _showOutsideBoundaryDialog();
+                        }
+                      }
+                    } catch (e) {
+                      debugPrint("Place details error: $e");
+                    }
+                  }
                 },
               ),
             ),
