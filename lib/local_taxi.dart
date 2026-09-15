@@ -171,16 +171,7 @@ class _LocalTaxiState extends State<LocalTaxi> {
     });
   }
 
-  @override
-  void dispose() {
-    _cabMotionTimer?.cancel();
-    fromController.dispose();
-    toController.dispose();
-    distanceController.dispose();
-    fromFocusNode.dispose();
-    toFocusNode.dispose();
-    super.dispose();
-  }
+
 
   void _onFromChanged() {
     if (fromController.text.isNotEmpty && toController.text.isNotEmpty) {
@@ -1411,8 +1402,10 @@ class _LocalTaxiState extends State<LocalTaxi> {
 
   @override
   void dispose() {
+    _cabMotionTimer?.cancel();
     fromController.dispose();
     toController.dispose();
+    distanceController.dispose();
     fromFocusNode.dispose();
     toFocusNode.dispose();
     super.dispose();
