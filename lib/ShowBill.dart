@@ -159,7 +159,10 @@ class _ShowBillPageState extends State<ShowBillPage> {
         "email": emailController.text,
         "userNumber": savedNumber,
         "pincode": pincodeController.text,
-        "base_charge": widget.baseCharge.toString(),
+        "base_charge": ((baseTripFare - widget.tollCharge - widget.driverTa) > 0
+                ? (baseTripFare - widget.tollCharge - widget.driverTa)
+                : baseTripFare)
+            .toStringAsFixed(2),
         "driver_ta": widget.driverTa.toString(),
         "toll_charge": widget.tollCharge.toString(),
         "total_amount": widget.totalAmount.toString(),
