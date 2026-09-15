@@ -749,17 +749,23 @@ class _ShowBillPageState extends State<ShowBillPage> {
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text("CONFIRM BOOKING (₹0 ADVANCE)",
-                style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                    letterSpacing: 1)),
-            const SizedBox(width: 10),
-            const Icon(Icons.arrow_forward),
-          ],
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Text(
+                "CONFIRM BOOKING (₹0 ADVANCE)",
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 15,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              SizedBox(width: 8),
+              Icon(Icons.arrow_forward, size: 20),
+            ],
+          ),
         ),
       ),
     );
