@@ -13,6 +13,7 @@ import 'package:agni_car_rental/config/api_config.dart';
 import 'DriverToPickupMap.dart';
 import 'package:share_plus/share_plus.dart';
 import 'cancellationSuccessPage.dart';
+import 'tripDetailsPage.dart';
 
 class BookingStatusPage extends StatefulWidget {
   @override
@@ -1655,7 +1656,26 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                   ],
                   Row(
                     children: [
+                      Expanded(
+                        child: _actionButton(
+                          "View Details",
+                          Icons.receipt_long_rounded,
+                          const Color(0xFF1C1F26),
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TripDetailsPage(
+                                booking: Map<String, dynamic>.from(booking),
+                                driver: driver,
+                                isPast: isPast,
+                                onCancelBooking: (ctx, b) => _showCancellationBottomSheet(ctx, b),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                       if (booking['payment_type'] == 'Advance') ...[
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _actionButton(
                               "Advance Receipt",
@@ -1663,10 +1683,9 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                               Colors.green[700]!,
                               () => _showAdvanceReceipt(context, booking)),
                         ),
-                        if ((!isPast && driver != null) || (isPast && status == 'Completed'))
-                          const SizedBox(width: 8),
                       ],
-                      if (!isPast && driver != null)
+                      if (!isPast && driver != null) ...[
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _actionButton(
                               "Track Driver",
@@ -1682,10 +1701,12 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                                               bookingId:
                                                   booking['id'].toString())))),
                         ),
-                      if (isPast && status == 'Completed')
+                      ],
+                      if (isPast && status == 'Completed') ...[
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _actionButton(
-                              "Download Invoice",
+                              "Invoice",
                               Icons.receipt_long_outlined,
                               Colors.yellow[800]!,
                               () => Navigator.push(
@@ -1694,6 +1715,7 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                                       builder: (_) => InvoicePage(
                                           bookingId: booking['id'].toString())))),
                         ),
+                      ],
                     ],
                   ),
                   if (discount > 0 || savings > 0)
