@@ -15,6 +15,7 @@ import 'localDutyReg.dart';
 import 'local_taxi.dart';
 import 'oneWayDateAndTime.dart';
 import 'services/boundary_service.dart';
+import 'utils/uber_map_markers.dart';
 
 class FromToMapScreen extends StatefulWidget {
   @override
@@ -41,6 +42,13 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
   LatLng? currentLatLng;
   Timer? _debounce;
 
+  // Uber Style Marker Assets & Nearby Cabs
+  BitmapDescriptor? _carIcon;
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _dropIcon;
+  List<NearbyCab> _nearbyCabs = [];
+  Timer? _cabMotionTimer;
+
   final Color amberPrimary = const Color(0xFFFFC107);
   final Color charcoalDark = const Color(0xFF1A1A1A);
 
@@ -49,11 +57,26 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
     super.initState();
     fetchApiKey();
     BoundaryService().fetchCityBoundaries();
+    _initUberMarkers();
+  }
+
+  Future<void> _initUberMarkers() async {
+    try {
+      _carIcon = await UberMapMarkers.getTopDownCarMarker();
+      _pickupIcon = await UberMapMarkers.getPickupMarker(label: "PICKUP");
+      _dropIcon = await UberMapMarkers.getDropMarker(label: "DROP");
+      if (mounted) {
+        _updateMapMarkers();
+      }
+    } catch (e) {
+      debugPrint("Marker init error: $e");
+    }
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _cabMotionTimer?.cancel();
     fromController.dispose();
     toController.dispose();
     super.dispose();
@@ -162,19 +185,64 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
   }
 
   void _updateMapMarkers() {
-    markers.clear();
-    if (fromLatLng != null)
-      markers.add(Marker(
+    final Set<Marker> newMarkers = {};
+    if (fromLatLng != null) {
+      newMarkers.add(
+        Marker(
           markerId: const MarkerId("from"),
           position: fromLatLng!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueOrange)));
-    if (toLatLng != null)
-      markers.add(Marker(
+          anchor: const Offset(0.5, 0.85),
+          icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          zIndex: 6,
+        ),
+      );
+
+      // Initialize nearby cars around pickup if empty
+      if (_nearbyCabs.isEmpty) {
+        _nearbyCabs = NearbyCab.generateAround(fromLatLng!, count: 4);
+        _cabMotionTimer?.cancel();
+        _cabMotionTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+          if (!mounted) return;
+          for (var cab in _nearbyCabs) {
+            cab.step();
+          }
+          _updateMapMarkers();
+        });
+      }
+    }
+
+    if (toLatLng != null) {
+      newMarkers.add(
+        Marker(
           markerId: const MarkerId("to"),
           position: toLatLng!,
-          icon:
-              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed)));
+          anchor: const Offset(0.5, 0.85),
+          icon: _dropIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          zIndex: 6,
+        ),
+      );
+    }
+
+    // Add animated nearby cars around pickup (like Uber)
+    if (_carIcon != null && _nearbyCabs.isNotEmpty && toLatLng == null) {
+      for (var cab in _nearbyCabs) {
+        newMarkers.add(
+          Marker(
+            markerId: MarkerId(cab.id),
+            position: cab.position,
+            rotation: cab.heading,
+            flat: true,
+            anchor: const Offset(0.5, 0.5),
+            icon: _carIcon!,
+            zIndex: 3,
+          ),
+        );
+      }
+    }
+
+    setState(() {
+      markers = newMarkers;
+    });
   }
 
 // ...existing code...

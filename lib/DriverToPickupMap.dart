@@ -9,6 +9,7 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'utils/uber_map_markers.dart';
 
 class DriverToPickupMapYellowFinalV2 extends StatefulWidget {
   final String driverId;
@@ -86,7 +87,7 @@ class _DriverToPickupMapYellowFinalV2State
 
     _loadIcons().then((_) {
       _fetchDriverAndDestination(refreshOnly: false);
-      _refreshTimer = Timer.periodic(const Duration(seconds: 40),
+      _refreshTimer = Timer.periodic(const Duration(seconds: 8),
           (_) => _fetchDriverAndDestination(refreshOnly: true));
     });
   }
@@ -114,45 +115,16 @@ class _DriverToPickupMapYellowFinalV2State
   }
 
   Future<void> _loadIcons() async {
-    _carIcon =
-        await _bitmapDescriptorFromIcon(Icons.local_taxi, darkCharcoal, 80);
-    _pickupIcon = await _createPickupMarker(primaryAmber, 100);
-    setState(() {});
+    try {
+      _carIcon = await UberMapMarkers.getTopDownCarMarker();
+      _pickupIcon = await UberMapMarkers.getPickupMarker(label: "PICKUP");
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint("Load icons error: $e");
+    }
   }
 
-  Future<BitmapDescriptor> _bitmapDescriptorFromIcon(
-      IconData iconData, Color color, int size) async {
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final textPainter = TextPainter(textDirection: TextDirection.ltr);
-    textPainter.text = TextSpan(
-        text: String.fromCharCode(iconData.codePoint),
-        style: TextStyle(
-            fontSize: size.toDouble(),
-            fontFamily: iconData.fontFamily,
-            color: color));
-    textPainter.layout();
-    textPainter.paint(canvas, const Offset(0, 0));
-    final image = await recorder.endRecording().toImage(size, size);
-    final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!
-        .buffer
-        .asUint8List();
-    return BitmapDescriptor.fromBytes(bytes);
-  }
 
-  Future<BitmapDescriptor> _createPickupMarker(Color color, int size) async {
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final paint = Paint()..color = color;
-    canvas.drawCircle(Offset(size / 2, size / 2), size / 2 - 5, paint);
-    canvas.drawCircle(
-        Offset(size / 2, size / 2), size / 4, Paint()..color = Colors.white);
-    final image = await recorder.endRecording().toImage(size, size);
-    final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!
-        .buffer
-        .asUint8List();
-    return BitmapDescriptor.fromBytes(bytes);
-  }
 
   Future<void> _fetchDriverAndDestination({bool refreshOnly = false}) async {
     try {

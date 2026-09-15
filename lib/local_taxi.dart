@@ -12,6 +12,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'OneWayRegistration.dart';
 import 'localTaxycustomer_reg.dart';
 import 'package:agni_car_rental/config/api_config.dart';
+import 'utils/uber_map_markers.dart';
+import 'dart:async';
 
 class LocalTaxi extends StatefulWidget {
   final String? initialFrom;
@@ -61,6 +63,13 @@ class _LocalTaxiState extends State<LocalTaxi> {
   FocusNode fromFocusNode = FocusNode();
   FocusNode toFocusNode = FocusNode();
 
+  // Uber Style Marker Assets & Nearby Cabs
+  BitmapDescriptor? _carIcon;
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _dropIcon;
+  List<NearbyCab> _nearbyCabs = [];
+  Timer? _cabMotionTimer;
+
   // Color Palette
   final Color primaryAmber = const Color(0xFFFFB300);
   final Color secondaryYellow = const Color(0xFFFFD54F);
@@ -72,19 +81,13 @@ class _LocalTaxiState extends State<LocalTaxi> {
     super.initState();
     fetchApiKey();
     _fetchCityBoundaries();
+    _initUberMarkers();
 
     // Check if initial parameters were passed
     if (widget.initialFrom != null) {
       fromController.text = widget.initialFrom!;
       fullAddress = widget.initialFrom!;
       fromLatLng = widget.initialFromLatLng;
-      if (fromLatLng != null) {
-        markers.add(Marker(
-          markerId: const MarkerId("from"),
-          position: fromLatLng!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-        ));
-      }
     } else {
       _getCurrentLocation();
     }
@@ -92,14 +95,9 @@ class _LocalTaxiState extends State<LocalTaxi> {
     if (widget.initialTo != null) {
       toController.text = widget.initialTo!;
       toLatLng = widget.initialToLatLng;
-      if (toLatLng != null) {
-        markers.add(Marker(
-          markerId: const MarkerId("to"),
-          position: toLatLng!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        ));
-      }
     }
+
+    _updateMarkers();
 
     if (fromLatLng != null && toLatLng != null) {
       _calculateDistance();
@@ -107,6 +105,81 @@ class _LocalTaxiState extends State<LocalTaxi> {
 
     fromController.addListener(_onFromChanged);
     toController.addListener(_onToChanged);
+  }
+
+  Future<void> _initUberMarkers() async {
+    try {
+      _carIcon = await UberMapMarkers.getTopDownCarMarker();
+      _pickupIcon = await UberMapMarkers.getPickupMarker(label: "PICKUP");
+      _dropIcon = await UberMapMarkers.getDropMarker(label: "DROP");
+      if (mounted) _updateMarkers();
+    } catch (e) {
+      debugPrint("Uber marker init error: $e");
+    }
+  }
+
+  void _updateMarkers() {
+    final Set<Marker> newMarkers = {};
+    if (fromLatLng != null) {
+      newMarkers.add(Marker(
+        markerId: const MarkerId("from"),
+        position: fromLatLng!,
+        anchor: const Offset(0.5, 0.85),
+        icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+        zIndex: 6,
+      ));
+
+      if (_nearbyCabs.isEmpty) {
+        _nearbyCabs = NearbyCab.generateAround(fromLatLng!, count: 4);
+        _cabMotionTimer?.cancel();
+        _cabMotionTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+          if (!mounted) return;
+          for (var cab in _nearbyCabs) {
+            cab.step();
+          }
+          _updateMarkers();
+        });
+      }
+    }
+
+    if (toLatLng != null) {
+      newMarkers.add(Marker(
+        markerId: const MarkerId("to"),
+        position: toLatLng!,
+        anchor: const Offset(0.5, 0.85),
+        icon: _dropIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        zIndex: 6,
+      ));
+    }
+
+    if (_carIcon != null && _nearbyCabs.isNotEmpty && toLatLng == null) {
+      for (var cab in _nearbyCabs) {
+        newMarkers.add(Marker(
+          markerId: MarkerId(cab.id),
+          position: cab.position,
+          rotation: cab.heading,
+          flat: true,
+          anchor: const Offset(0.5, 0.5),
+          icon: _carIcon!,
+          zIndex: 3,
+        ));
+      }
+    }
+
+    setState(() {
+      markers = newMarkers;
+    });
+  }
+
+  @override
+  void dispose() {
+    _cabMotionTimer?.cancel();
+    fromController.dispose();
+    toController.dispose();
+    distanceController.dispose();
+    fromFocusNode.dispose();
+    toFocusNode.dispose();
+    super.dispose();
   }
 
   void _onFromChanged() {
@@ -166,13 +239,8 @@ class _LocalTaxiState extends State<LocalTaxi> {
           fromController.text = currentAddress;
           fullAddress = currentAddress;
           fromLatLng = LatLng(position.latitude, position.longitude);
-          markers.add(Marker(
-            markerId: const MarkerId("from"),
-            position: fromLatLng!,
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueOrange),
-          ));
         });
+        _updateMarkers();
       }
     } catch (e) {
       setState(() => isGettingLocation = false);
@@ -709,6 +777,7 @@ class _LocalTaxiState extends State<LocalTaxi> {
               onLatLng: (lat, lng, desc) {
                 fromLatLng = LatLng(lat, lng);
                 fullAddress = desc;
+                _updateMarkers();
                 _calculateDistance();
               }),
           Padding(
@@ -726,6 +795,7 @@ class _LocalTaxiState extends State<LocalTaxi> {
               focusNode: toFocusNode,
               onLatLng: (lat, lng, desc) {
                 toLatLng = LatLng(lat, lng);
+                _updateMarkers();
                 _calculateDistance();
               }),
           if (distanceController.text.isNotEmpty) ...[
