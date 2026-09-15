@@ -112,10 +112,27 @@ class _LocalTaxiState extends State<LocalTaxi> {
       _carIcon = await UberMapMarkers.getTopDownCarMarker();
       _pickupIcon = await UberMapMarkers.getPickupMarker(label: "PICKUP");
       _dropIcon = await UberMapMarkers.getDropMarker(label: "DROP");
-      if (mounted) _updateMarkers();
+      if (mounted) {
+        if (fromLatLng != null && _nearbyCabs.isEmpty) {
+          _spawnNearbyCabs(fromLatLng!);
+        }
+        _updateMarkers();
+      }
     } catch (e) {
       debugPrint("Uber marker init error: $e");
     }
+  }
+
+  void _spawnNearbyCabs(LatLng center) {
+    _nearbyCabs = NearbyCab.generateAround(center, count: 5);
+    _cabMotionTimer?.cancel();
+    _cabMotionTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted) return;
+      for (var cab in _nearbyCabs) {
+        cab.step();
+      }
+      _updateMarkers();
+    });
   }
 
   void _updateMarkers() {
@@ -126,19 +143,11 @@ class _LocalTaxiState extends State<LocalTaxi> {
         position: fromLatLng!,
         anchor: const Offset(0.5, 0.85),
         icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-        zIndex: 6,
+        zIndex: 10,
       ));
 
       if (_nearbyCabs.isEmpty) {
-        _nearbyCabs = NearbyCab.generateAround(fromLatLng!, count: 4);
-        _cabMotionTimer?.cancel();
-        _cabMotionTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-          if (!mounted) return;
-          for (var cab in _nearbyCabs) {
-            cab.step();
-          }
-          _updateMarkers();
-        });
+        _spawnNearbyCabs(fromLatLng!);
       }
     }
 
@@ -148,11 +157,11 @@ class _LocalTaxiState extends State<LocalTaxi> {
         position: toLatLng!,
         anchor: const Offset(0.5, 0.85),
         icon: _dropIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        zIndex: 6,
+        zIndex: 10,
       ));
     }
 
-    if (_carIcon != null && _nearbyCabs.isNotEmpty && toLatLng == null) {
+    if (_carIcon != null && _nearbyCabs.isNotEmpty) {
       for (var cab in _nearbyCabs) {
         newMarkers.add(Marker(
           markerId: MarkerId(cab.id),
@@ -161,14 +170,16 @@ class _LocalTaxiState extends State<LocalTaxi> {
           flat: true,
           anchor: const Offset(0.5, 0.5),
           icon: _carIcon!,
-          zIndex: 3,
+          zIndex: 5,
         ));
       }
     }
 
-    setState(() {
-      markers = newMarkers;
-    });
+    if (mounted) {
+      setState(() {
+        markers = newMarkers;
+      });
+    }
   }
 
 

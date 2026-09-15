@@ -12,10 +12,10 @@ class UberMapMarkers {
 
   /// Generate a high-resolution, realistic top-down car icon (like Uber/Ola)
   static Future<BitmapDescriptor> getTopDownCarMarker({
-    Color bodyColor = const Color(0xFF1E1E1E), // Sleek black/dark charcoal car
+    Color bodyColor = const Color(0xFF1E1E1E), // Sleek obsidian/graphite car
     Color roofColor = const Color(0xFF2C2C2C),
-    double width = 80,
-    double height = 150,
+    double width = 90,
+    double height = 160,
   }) async {
     if (_cachedCarMarker != null) return _cachedCarMarker!;
 
@@ -28,11 +28,11 @@ class UberMapMarkers {
 
     // 1. Soft Ambient Road Shadow
     final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.25)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      ..color = Colors.black.withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy + 2), width: width * 0.72, height: height * 0.85),
+        Rect.fromCenter(center: Offset(cx, cy + 2), width: width * 0.74, height: height * 0.86),
         const Radius.circular(16),
       ),
       shadowPaint,
@@ -40,37 +40,37 @@ class UberMapMarkers {
 
     // 2. Wheels / Tires (4 tires peeking out slightly)
     final tirePaint = Paint()..color = const Color(0xFF111111);
-    final tireWidth = width * 0.14;
+    final tireWidth = width * 0.15;
     final tireHeight = height * 0.20;
     const tireRadius = Radius.circular(4);
 
     // Front Left & Right
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(cx - width * 0.40, cy - height * 0.36, tireWidth, tireHeight), tireRadius),
+      RRect.fromRectAndRadius(Rect.fromLTWH(cx - width * 0.42, cy - height * 0.36, tireWidth, tireHeight), tireRadius),
       tirePaint,
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(cx + width * 0.40 - tireWidth, cy - height * 0.36, tireWidth, tireHeight), tireRadius),
+      RRect.fromRectAndRadius(Rect.fromLTWH(cx + width * 0.42 - tireWidth, cy - height * 0.36, tireWidth, tireHeight), tireRadius),
       tirePaint,
     );
     // Rear Left & Right
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(cx - width * 0.40, cy + height * 0.16, tireWidth, tireHeight), tireRadius),
+      RRect.fromRectAndRadius(Rect.fromLTWH(cx - width * 0.42, cy + height * 0.16, tireWidth, tireHeight), tireRadius),
       tirePaint,
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(cx + width * 0.40 - tireWidth, cy + height * 0.16, tireWidth, tireHeight), tireRadius),
+      RRect.fromRectAndRadius(Rect.fromLTWH(cx + width * 0.42 - tireWidth, cy + height * 0.16, tireWidth, tireHeight), tireRadius),
       tirePaint,
     );
 
     // 3. Side Mirrors
     final mirrorPaint = Paint()..color = bodyColor;
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(cx - width * 0.44, cy - height * 0.20, width * 0.10, height * 0.08), const Radius.circular(3)),
+      RRect.fromRectAndRadius(Rect.fromLTWH(cx - width * 0.46, cy - height * 0.20, width * 0.10, height * 0.08), const Radius.circular(3)),
       mirrorPaint,
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(cx + width * 0.34, cy - height * 0.20, width * 0.10, height * 0.08), const Radius.circular(3)),
+      RRect.fromRectAndRadius(Rect.fromLTWH(cx + width * 0.36, cy - height * 0.20, width * 0.10, height * 0.08), const Radius.circular(3)),
       mirrorPaint,
     );
 
@@ -79,22 +79,22 @@ class UberMapMarkers {
       ..shader = ui.Gradient.linear(
         Offset(cx, cy - height * 0.45),
         Offset(cx, cy + height * 0.45),
-        [const Color(0xFF3A3A3A), bodyColor, const Color(0xFF151515)],
+        [const Color(0xFF3F3F46), bodyColor, const Color(0xFF18181B)],
       );
     final bodyRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy), width: width * 0.70, height: height * 0.88),
+      Rect.fromCenter(center: Offset(cx, cy), width: width * 0.72, height: height * 0.88),
       const Radius.circular(18),
     );
     canvas.drawRRect(bodyRect, bodyPaint);
 
-    // Subtle edge highlight
+    // Subtle amber trim on the side/front
     final borderPaint = Paint()
-      ..color = const Color(0xFFFFB300) // Rentox amber trim
+      ..color = const Color(0xFFFFC107) // Rentox amber trim
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     canvas.drawRRect(bodyRect, borderPaint);
 
-    // 5. Front Windshield (Dark curved glass)
+    // 5. Front Windshield (Dark curved glass with subtle reflection)
     final glassPaint = Paint()..color = const Color(0xFF0F172A);
     final frontGlassPath = Path()
       ..moveTo(cx - width * 0.26, cy - height * 0.16)
@@ -123,8 +123,8 @@ class UberMapMarkers {
       roofPaint,
     );
 
-    // 8. Headlights (Front Warm Glowing Accents)
-    final headlightPaint = Paint()..color = const Color(0xFFFFF9C4);
+    // 8. Headlights (Front Warm Glowing Xenon/LED Accents)
+    final headlightPaint = Paint()..color = const Color(0xFFFFF59D);
     canvas.drawRRect(
       RRect.fromRectAndRadius(Rect.fromLTWH(cx - width * 0.30, cy - height * 0.43, width * 0.14, height * 0.06), const Radius.circular(3)),
       headlightPaint,
@@ -134,7 +134,7 @@ class UberMapMarkers {
       headlightPaint,
     );
 
-    // 9. Taillights (Rear Red Accents)
+    // 9. Taillights (Rear Red LED Accents)
     final taillightPaint = Paint()..color = const Color(0xFFEF4444);
     canvas.drawRRect(
       RRect.fromRectAndRadius(Rect.fromLTWH(cx - width * 0.28, cy + height * 0.40, width * 0.14, height * 0.04), const Radius.circular(2)),
@@ -149,7 +149,8 @@ class UberMapMarkers {
     final img = await picture.toImage(size.width.toInt(), size.height.toInt());
     final ByteData? byteData = await img.toByteData(format: ui.ImageByteFormat.png);
 
-    _cachedCarMarker = BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    final Uint8List uint8List = byteData!.buffer.asUint8List();
+    _cachedCarMarker = BitmapDescriptor.bytes(uint8List);
     return _cachedCarMarker!;
   }
 
@@ -167,7 +168,7 @@ class UberMapMarkers {
 
     // 1. Soft Shadow
     final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.2)
+      ..color = Colors.black.withValues(alpha: 0.25)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
     canvas.drawRRect(
       RRect.fromRectAndRadius(const Rect.fromLTWH(8, 6, width - 16, 42), const Radius.circular(21)),
@@ -225,7 +226,8 @@ class UberMapMarkers {
     final img = await picture.toImage(width.toInt(), height.toInt());
     final ByteData? byteData = await img.toByteData(format: ui.ImageByteFormat.png);
 
-    final desc = BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    final Uint8List uint8List = byteData!.buffer.asUint8List();
+    final desc = BitmapDescriptor.bytes(uint8List);
     if (label == "PICKUP") _cachedPickupMarker = desc;
     return desc;
   }
@@ -244,7 +246,7 @@ class UberMapMarkers {
 
     // 1. Soft Shadow
     final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.2)
+      ..color = Colors.black.withValues(alpha: 0.25)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
     canvas.drawRRect(
       RRect.fromRectAndRadius(const Rect.fromLTWH(8, 6, width - 16, 42), const Radius.circular(21)),
@@ -302,7 +304,8 @@ class UberMapMarkers {
     final img = await picture.toImage(width.toInt(), height.toInt());
     final ByteData? byteData = await img.toByteData(format: ui.ImageByteFormat.png);
 
-    final desc = BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    final Uint8List uint8List = byteData!.buffer.asUint8List();
+    final desc = BitmapDescriptor.bytes(uint8List);
     if (label == "DROP") _cachedDropMarker = desc;
     return desc;
   }
@@ -333,15 +336,16 @@ class NearbyCab {
     heading = (heading + (math.Random().nextDouble() * 4 - 2)) % 360;
   }
 
-  static List<NearbyCab> generateAround(LatLng center, {int count = 4}) {
+  static List<NearbyCab> generateAround(LatLng center, {int count = 5}) {
     final random = math.Random(center.latitude.toInt() + center.longitude.toInt());
     final List<NearbyCab> cabs = [];
     final offsets = [
-      [0.0042, 0.0031],
-      [-0.0035, 0.0048],
-      [0.0051, -0.0042],
-      [-0.0048, -0.0033],
-      [0.0022, -0.0061],
+      [0.0035, 0.0028],
+      [-0.0030, 0.0042],
+      [0.0045, -0.0038],
+      [-0.0042, -0.0029],
+      [0.0018, -0.0055],
+      [-0.0022, 0.0060],
     ];
 
     for (int i = 0; i < count && i < offsets.length; i++) {
@@ -360,3 +364,4 @@ class NearbyCab {
     return cabs;
   }
 }
+

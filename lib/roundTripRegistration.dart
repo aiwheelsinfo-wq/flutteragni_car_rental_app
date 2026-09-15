@@ -13,6 +13,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:agni_car_rental/rounTripDateAndTime.dart';
 import 'local_taxi.dart';
 import 'services/boundary_service.dart';
+import 'utils/uber_map_markers.dart';
 
 class RoundTripFromToMapScreen extends StatefulWidget {
   const RoundTripFromToMapScreen({Key? key}) : super(key: key);
@@ -43,6 +44,13 @@ class _FromToMapScreenState extends State<RoundTripFromToMapScreen> {
   double? tripDistanceInKm;
   Timer? _debounce;
 
+  // Uber Style Marker Assets & Nearby Cabs
+  BitmapDescriptor? _carIcon;
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _dropIcon;
+  List<NearbyCab> _nearbyCabs = [];
+  Timer? _cabMotionTimer;
+
   // Professional Theme Colors
   final Color primaryAmber = const Color(0xFFFFC107);
   final Color charcoalDark = const Color(0xFF1A1A1A);
@@ -53,11 +61,41 @@ class _FromToMapScreenState extends State<RoundTripFromToMapScreen> {
     super.initState();
     fetchApiKey();
     BoundaryService().fetchCityBoundaries();
+    _initUberMarkers();
+  }
+
+  Future<void> _initUberMarkers() async {
+    try {
+      _carIcon = await UberMapMarkers.getTopDownCarMarker();
+      _pickupIcon = await UberMapMarkers.getPickupMarker(label: "PICKUP");
+      _dropIcon = await UberMapMarkers.getDropMarker(label: "DROP");
+      if (mounted) {
+        if (fromLatLng != null && _nearbyCabs.isEmpty) {
+          _spawnNearbyCabs(fromLatLng!);
+        }
+        _updateMapMarkers();
+      }
+    } catch (e) {
+      debugPrint("Uber marker init error: $e");
+    }
+  }
+
+  void _spawnNearbyCabs(LatLng center) {
+    _nearbyCabs = NearbyCab.generateAround(center, count: 5);
+    _cabMotionTimer?.cancel();
+    _cabMotionTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted) return;
+      for (var cab in _nearbyCabs) {
+        cab.step();
+      }
+      _updateMapMarkers();
+    });
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _cabMotionTimer?.cancel();
     fromController.dispose();
     toController.dispose();
     fromFocus.dispose();
@@ -132,6 +170,7 @@ class _FromToMapScreenState extends State<RoundTripFromToMapScreen> {
         setState(() {
           fromController.text = data['results'][0]['formatted_address'];
           fromLatLng = LatLng(lat, lng);
+          _spawnNearbyCabs(fromLatLng!);
           _updateMapMarkers();
         });
       }
@@ -155,6 +194,7 @@ class _FromToMapScreenState extends State<RoundTripFromToMapScreen> {
         if (isFrom) {
           fromController.text = prediction.description!;
           fromLatLng = LatLng(loc.lat!, loc.lng!);
+          _spawnNearbyCabs(fromLatLng!);
           FocusScope.of(context).requestFocus(toFocus);
         } else {
           toController.text = prediction.description!;
@@ -173,20 +213,49 @@ class _FromToMapScreenState extends State<RoundTripFromToMapScreen> {
   }
 
   void _updateMapMarkers() {
-    markers.clear();
+    final Set<Marker> newMarkers = {};
     if (fromLatLng != null) {
-      markers.add(Marker(
+      newMarkers.add(Marker(
         markerId: const MarkerId("from"),
         position: fromLatLng!,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+        anchor: const Offset(0.5, 0.85),
+        icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+        zIndex: 10,
       ));
+
+      if (_nearbyCabs.isEmpty) {
+        _spawnNearbyCabs(fromLatLng!);
+      }
     }
+
     if (toLatLng != null) {
-      markers.add(Marker(
+      newMarkers.add(Marker(
         markerId: const MarkerId("to"),
         position: toLatLng!,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        anchor: const Offset(0.5, 0.85),
+        icon: _dropIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        zIndex: 10,
       ));
+    }
+
+    if (_carIcon != null && _nearbyCabs.isNotEmpty) {
+      for (var cab in _nearbyCabs) {
+        newMarkers.add(Marker(
+          markerId: MarkerId(cab.id),
+          position: cab.position,
+          rotation: cab.heading,
+          flat: true,
+          anchor: const Offset(0.5, 0.5),
+          icon: _carIcon!,
+          zIndex: 5,
+        ));
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        markers = newMarkers;
+      });
     }
   }
 

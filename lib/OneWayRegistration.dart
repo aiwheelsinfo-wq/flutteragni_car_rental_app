@@ -66,11 +66,26 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
       _pickupIcon = await UberMapMarkers.getPickupMarker(label: "PICKUP");
       _dropIcon = await UberMapMarkers.getDropMarker(label: "DROP");
       if (mounted) {
+        if (fromLatLng != null && _nearbyCabs.isEmpty) {
+          _spawnNearbyCabs(fromLatLng!);
+        }
         _updateMapMarkers();
       }
     } catch (e) {
       debugPrint("Marker init error: $e");
     }
+  }
+
+  void _spawnNearbyCabs(LatLng center) {
+    _nearbyCabs = NearbyCab.generateAround(center, count: 5);
+    _cabMotionTimer?.cancel();
+    _cabMotionTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted) return;
+      for (var cab in _nearbyCabs) {
+        cab.step();
+      }
+      _updateMapMarkers();
+    });
   }
 
   @override
@@ -146,6 +161,7 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
         setState(() {
           fromController.text = data['results'][0]['formatted_address'];
           fromLatLng = LatLng(lat, lng);
+          _spawnNearbyCabs(fromLatLng!);
           _updateMapMarkers();
         });
       }
@@ -169,6 +185,7 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
         if (isFrom) {
           fromController.text = prediction.description!;
           fromLatLng = LatLng(loc.lat!, loc.lng!);
+          _spawnNearbyCabs(fromLatLng!);
         } else {
           toController.text = prediction.description!;
           toLatLng = LatLng(loc.lat!, loc.lng!);
@@ -193,21 +210,13 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
           position: fromLatLng!,
           anchor: const Offset(0.5, 0.85),
           icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-          zIndex: 6,
+          zIndex: 10,
         ),
       );
 
       // Initialize nearby cars around pickup if empty
       if (_nearbyCabs.isEmpty) {
-        _nearbyCabs = NearbyCab.generateAround(fromLatLng!, count: 4);
-        _cabMotionTimer?.cancel();
-        _cabMotionTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-          if (!mounted) return;
-          for (var cab in _nearbyCabs) {
-            cab.step();
-          }
-          _updateMapMarkers();
-        });
+        _spawnNearbyCabs(fromLatLng!);
       }
     }
 
@@ -218,13 +227,13 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
           position: toLatLng!,
           anchor: const Offset(0.5, 0.85),
           icon: _dropIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-          zIndex: 6,
+          zIndex: 10,
         ),
       );
     }
 
-    // Add animated nearby cars around pickup (like Uber)
-    if (_carIcon != null && _nearbyCabs.isNotEmpty && toLatLng == null) {
+    // Add animated nearby cars around pickup (like Uber) - ALWAYS VISIBLE!
+    if (_carIcon != null && _nearbyCabs.isNotEmpty) {
       for (var cab in _nearbyCabs) {
         newMarkers.add(
           Marker(
@@ -234,15 +243,17 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
             flat: true,
             anchor: const Offset(0.5, 0.5),
             icon: _carIcon!,
-            zIndex: 3,
+            zIndex: 5,
           ),
         );
       }
     }
 
-    setState(() {
-      markers = newMarkers;
-    });
+    if (mounted) {
+      setState(() {
+        markers = newMarkers;
+      });
+    }
   }
 
 // ...existing code...
