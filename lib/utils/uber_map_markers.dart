@@ -80,6 +80,7 @@ class UberMapMarkers {
         Offset(cx, cy - height * 0.45),
         Offset(cx, cy + height * 0.45),
         [const Color(0xFF3F3F46), bodyColor, const Color(0xFF18181B)],
+        [0.0, 0.5, 1.0],
       );
     final bodyRect = RRect.fromRectAndRadius(
       Rect.fromCenter(center: Offset(cx, cy), width: width * 0.72, height: height * 0.88),
