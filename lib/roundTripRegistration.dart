@@ -257,6 +257,10 @@ class _FromToMapScreenState extends State<RoundTripFromToMapScreen> {
           flat: true,
           anchor: const Offset(0.5, 0.5),
           icon: _carIcon!,
+          infoWindow: InfoWindow(
+            title: cab.driverName ?? "Online Driver",
+            snippet: "${cab.vehicleType ?? 'Available'} • Online",
+          ),
           zIndex: 5,
         ));
       }

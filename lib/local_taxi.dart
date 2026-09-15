@@ -180,6 +180,10 @@ class _LocalTaxiState extends State<LocalTaxi> {
           flat: true,
           anchor: const Offset(0.5, 0.5),
           icon: _carIcon!,
+          infoWindow: InfoWindow(
+            title: cab.driverName ?? "Online Driver",
+            snippet: "${cab.vehicleType ?? 'Available'} • Online",
+          ),
           zIndex: 5,
         ));
       }

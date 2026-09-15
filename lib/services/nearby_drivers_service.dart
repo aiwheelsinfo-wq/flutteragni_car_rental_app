@@ -12,7 +12,7 @@ class NearbyDriversService {
   NearbyDriversService._internal();
 
   /// Fetch real online active drivers from the database by GPS coordinates
-  Future<List<NearbyCab>> fetchNearbyDrivers(LatLng center, {double radiusKm = 35.0}) async {
+  Future<List<NearbyCab>> fetchNearbyDrivers(LatLng center, {double radiusKm = 50.0}) async {
     try {
       final url = Uri.parse(
         "${ApiConfig.baseUrl}/get_nearby_drivers.php?lat=${center.latitude}&lng=${center.longitude}&radius=$radiusKm",
@@ -21,7 +21,7 @@ class NearbyDriversService {
       final response = await http.get(url).timeout(const Duration(seconds: 4));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['status'] == 'success' && data['drivers'] is List && (data['drivers'] as List).isNotEmpty) {
+        if (data['status'] == 'success' && data['drivers'] is List) {
           final List driversList = data['drivers'];
           final List<NearbyCab> realCabs = [];
 
@@ -33,7 +33,7 @@ class NearbyDriversService {
             final String name = d['name']?.toString() ?? "Active Driver";
             final String vType = d['vehicle_type']?.toString() ?? "Cab";
 
-            // Random heading or calculated bearing
+            // Bearing
             final double heading = (math.Random(lat.toInt() + lng.toInt()).nextDouble() * 360);
 
             realCabs.add(
@@ -54,7 +54,7 @@ class NearbyDriversService {
       debugPrint("Fetch nearby real drivers error: $e");
     }
 
-    // Graceful fallback to client simulated discovery fleet if no active driver is in that area
-    return NearbyCab.generateAround(center, count: 4);
+    // Return empty list if no real drivers are online in the area (NO FAKE DATA)
+    return [];
   }
 }

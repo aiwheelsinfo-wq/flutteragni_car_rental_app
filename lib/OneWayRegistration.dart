@@ -242,7 +242,7 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
       );
     }
 
-    // Add animated nearby cars around pickup (like Uber) - ALWAYS VISIBLE!
+    // Add real online drivers from database - ALWAYS VISIBLE!
     if (_carIcon != null && _nearbyCabs.isNotEmpty) {
       for (var cab in _nearbyCabs) {
         newMarkers.add(
@@ -253,6 +253,10 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
             flat: true,
             anchor: const Offset(0.5, 0.5),
             icon: _carIcon!,
+            infoWindow: InfoWindow(
+              title: cab.driverName ?? "Online Driver",
+              snippet: "${cab.vehicleType ?? 'Available'} • Online",
+            ),
             zIndex: 5,
           ),
         );
