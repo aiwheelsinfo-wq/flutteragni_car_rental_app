@@ -1785,30 +1785,7 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                           ],
                         ),
                       ),
-                    ),
-                  if (!isPast && _canCancelBooking(booking)) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showCancellationBottomSheet(context, booking),
-                        icon: const Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 18),
-                        label: Text(
-                          "Cancel Booking",
-                          style: GoogleFonts.poppins(
-                            color: Colors.redAccent,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.redAccent, width: 1),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ],
               ),
             ),
