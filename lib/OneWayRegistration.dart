@@ -15,6 +15,7 @@ import 'localDutyReg.dart';
 import 'local_taxi.dart';
 import 'oneWayDateAndTime.dart';
 import 'services/boundary_service.dart';
+import 'services/nearby_drivers_service.dart';
 import 'utils/uber_map_markers.dart';
 
 class FromToMapScreen extends StatefulWidget {
@@ -76,15 +77,24 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
     }
   }
 
-  void _spawnNearbyCabs(LatLng center) {
-    _nearbyCabs = NearbyCab.generateAround(center, count: 5);
+  Future<void> _spawnNearbyCabs(LatLng center) async {
+    final cabs = await NearbyDriversService().fetchNearbyDrivers(center);
+    if (!mounted) return;
+    setState(() {
+      _nearbyCabs = cabs;
+    });
+    _updateMapMarkers();
+
     _cabMotionTimer?.cancel();
-    _cabMotionTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (!mounted) return;
-      for (var cab in _nearbyCabs) {
-        cab.step();
+    _cabMotionTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      if (!mounted || fromLatLng == null) return;
+      final updated = await NearbyDriversService().fetchNearbyDrivers(fromLatLng!);
+      if (mounted) {
+        setState(() {
+          _nearbyCabs = updated;
+        });
+        _updateMapMarkers();
       }
-      _updateMapMarkers();
     });
   }
 

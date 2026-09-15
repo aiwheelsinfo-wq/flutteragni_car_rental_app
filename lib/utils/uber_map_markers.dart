@@ -291,22 +291,29 @@ class UberMapMarkers {
   }
 }
 
-/// Simulated Nearby Cab for Uber Discovery Effect around Pickup Point
+/// Nearby Cab (Real or Simulated) for Uber Discovery Effect
 class NearbyCab {
   final String id;
   LatLng position;
   double heading;
   final double speed;
+  final bool isReal;
+  final String? driverName;
+  final String? vehicleType;
 
   NearbyCab({
     required this.id,
     required this.position,
     required this.heading,
     this.speed = 0.00003,
+    this.isReal = false,
+    this.driverName,
+    this.vehicleType,
   });
 
   void step() {
-    // Glide along heading
+    // Only simulated cabs glide periodically
+    if (isReal) return;
     final rad = heading * (math.pi / 180.0);
     position = LatLng(
       position.latitude + (math.cos(rad) * speed * (0.8 + math.Random().nextDouble() * 0.4)),
@@ -338,6 +345,7 @@ class NearbyCab {
         id: "cab_$i",
         position: cabPos,
         heading: angle,
+        isReal: false,
       ));
     }
     return cabs;

@@ -12,6 +12,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'OneWayRegistration.dart';
 import 'localTaxycustomer_reg.dart';
 import 'package:agni_car_rental/config/api_config.dart';
+import 'services/nearby_drivers_service.dart';
 import 'utils/uber_map_markers.dart';
 import 'dart:async';
 
@@ -123,15 +124,24 @@ class _LocalTaxiState extends State<LocalTaxi> {
     }
   }
 
-  void _spawnNearbyCabs(LatLng center) {
-    _nearbyCabs = NearbyCab.generateAround(center, count: 5);
+  Future<void> _spawnNearbyCabs(LatLng center) async {
+    final cabs = await NearbyDriversService().fetchNearbyDrivers(center);
+    if (!mounted) return;
+    setState(() {
+      _nearbyCabs = cabs;
+    });
+    _updateMarkers();
+
     _cabMotionTimer?.cancel();
-    _cabMotionTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (!mounted) return;
-      for (var cab in _nearbyCabs) {
-        cab.step();
+    _cabMotionTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      if (!mounted || fromLatLng == null) return;
+      final updated = await NearbyDriversService().fetchNearbyDrivers(fromLatLng!);
+      if (mounted) {
+        setState(() {
+          _nearbyCabs = updated;
+        });
+        _updateMarkers();
       }
-      _updateMarkers();
     });
   }
 
