@@ -231,45 +231,49 @@ class TripDetailsPage extends StatelessWidget {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            padding: const EdgeInsets.fromLTRB(16, 14, 14, 12),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.1),
-                        shape: BoxShape.circle,
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.vpn_key_rounded, color: Colors.black87, size: 18),
                       ),
-                      child: const Icon(Icons.vpn_key_rounded, color: Colors.black87, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "DRIVER START OTP",
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                            color: Colors.black87,
-                            letterSpacing: 0.5,
-                          ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "DRIVER START OTP",
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 11.5,
+                                color: Colors.black87,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            Text(
+                              "Share when trip begins",
+                              style: GoogleFonts.poppins(
+                                fontSize: 10.5,
+                                color: Colors.black54,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          "Share when trip begins",
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: Colors.black54,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 InkWell(
                   onTap: () {
                     Clipboard.setData(ClipboardData(text: otp));
@@ -284,7 +288,7 @@ class TripDetailsPage extends StatelessWidget {
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
                       color: Colors.black,
                       borderRadius: BorderRadius.circular(12),
@@ -296,13 +300,13 @@ class TripDetailsPage extends StatelessWidget {
                           otp,
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w900,
-                            fontSize: 22,
-                            letterSpacing: 3,
+                            fontSize: 20,
+                            letterSpacing: 2.5,
                             color: const Color(0xFFFFC107),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.copy_rounded, color: Colors.white, size: 16),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.copy_rounded, color: Colors.white, size: 14),
                       ],
                     ),
                   ),
