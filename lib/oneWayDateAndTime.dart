@@ -189,11 +189,17 @@ class _OneWayDateAndTimeState extends State<OneWayDateAndTime> {
       final pickedDateTime = DateTime(selectedDate!.year, selectedDate!.month,
           selectedDate!.day, time.hour, time.minute);
       final differenceInMinutes = pickedDateTime.difference(DateTime.now()).inMinutes;
-      if (differenceInMinutes < (minAdvanceHours * 60)) {
+
+      if (minAdvanceHours <= 0) {
+        if (differenceInMinutes < -5) {
+          _showError("Pickup time cannot be in the past");
+          return;
+        }
+      } else if (differenceInMinutes < (minAdvanceHours * 60)) {
         final hoursLabel = minAdvanceHours == minAdvanceHours.roundToDouble()
             ? minAdvanceHours.toInt().toString()
             : minAdvanceHours.toString();
-        _showError("Pickup must be at least $hoursLabel hours from now");
+        _showError("Pickup must be at least $hoursLabel ${minAdvanceHours == 1 ? 'hour' : 'hours'} from now");
         return;
       }
       setState(() => selectedTime = time);
@@ -250,10 +256,12 @@ class _OneWayDateAndTimeState extends State<OneWayDateAndTime> {
   }
 
   void _showError(String msg) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(msg),
         backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating));
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3)));
   }
 
   // --- UI COMPONENTS ---
@@ -429,7 +437,9 @@ class _OneWayDateAndTimeState extends State<OneWayDateAndTime> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              "Note: For immediate bookings, pickup must be at least ${minAdvanceHours == minAdvanceHours.roundToDouble() ? minAdvanceHours.toInt() : minAdvanceHours} hours from current time.",
+              minAdvanceHours <= 0
+                  ? "Immediate bookings are available for your route."
+                  : "Note: For immediate bookings, pickup must be at least ${minAdvanceHours == minAdvanceHours.roundToDouble() ? minAdvanceHours.toInt() : minAdvanceHours} ${minAdvanceHours == 1 ? 'hour' : 'hours'} from current time.",
               style: GoogleFonts.poppins(
                   fontSize: 12, color: charcoal.withOpacity(0.7)),
             ),
