@@ -306,6 +306,8 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
       double basePrice = selectedCar?.base ?? 0.0;
       double agentCommission = double.tryParse(commissionController.text) ?? 0.0;
       double totalAmt = basePrice + agentCommission;
+      double agniShare = (totalAmt * 0.10);
+      double vendorEarnings = (totalAmt - agniShare).clamp(0.0, double.infinity);
 
       final data = {
         'trip_type': 'Local-Duty',
@@ -324,8 +326,8 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
         'customer_mob': customerNumberController.text,
         'user_type': userType,
         'total_amount': totalAmt.toString(),
-        'vendor_amount': (selectedCar?.driverRate ?? 0).toString(),
-        'agni_amount': (selectedCar?.agni_share ?? 0).toString(),
+        'vendor_amount': vendorEarnings.toStringAsFixed(2),
+        'agni_amount': agniShare.toStringAsFixed(2),
         'payment_type': 'Pay to Driver',
         'gst': showGSTField.toString(),
         'gst_number': gstNumberController.text,
