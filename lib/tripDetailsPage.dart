@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'DriverToPickupMap.dart';
 import 'car_invoice.dart';
 
@@ -620,6 +622,120 @@ class TripDetailsPage extends StatelessWidget {
                 ],
               ),
             ),
+            if (double.tryParse(booking['driver_latitude']?.toString() ?? driver?['latitude']?.toString() ?? '') != null &&
+                double.tryParse(booking['driver_longitude']?.toString() ?? driver?['longitude']?.toString() ?? '') != null)
+              FutureBuilder<String>(
+                future: _getDriverAddress(
+                  double.parse((booking['driver_latitude'] ?? driver!['latitude']).toString()),
+                  double.parse((booking['driver_longitude'] ?? driver!['longitude']).toString()),
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    final lat = (booking['driver_latitude'] ?? driver!['latitude']).toString();
+                    final lng = (booking['driver_longitude'] ?? driver!['longitude']).toString();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: InkWell(
+                        onTap: () async {
+                          final url = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng");
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(url, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.blue.shade100,
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    width: 18,
+                                    height: 18,
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.navigation_rounded,
+                                    size: 11,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          "DRIVER LIVE LOCATION",
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.blue.shade800,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade500,
+                                            borderRadius: BorderRadius.circular(3),
+                                          ),
+                                          child: const Text(
+                                            "LIVE",
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 7,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 0.2,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      snapshot.data!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 11,
+                                        color: Colors.grey[700],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                Icons.open_in_new_rounded,
+                                size: 14,
+                                color: Colors.blue.shade600,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
           ] else ...[
             Container(
               width: double.infinity,
@@ -1044,5 +1160,22 @@ class TripDetailsPage extends StatelessWidget {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
+  }
+
+  Future<String> _getDriverAddress(double lat, double lng) async {
+    const String apiKey = "AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM";
+    final url =
+        "https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$apiKey";
+    try {
+      final response = await http.get(Uri.parse(url));
+      final data = json.decode(response.body);
+      if (data['status'] == 'OK' && data['results'] != null && data['results'].isNotEmpty) {
+        final result = data['results'][0];
+        return result['formatted_address'] ?? "Unknown Location";
+      }
+    } catch (e) {
+      debugPrint("Reverse geocoding error: $e");
+    }
+    return "Location not available";
   }
 }
