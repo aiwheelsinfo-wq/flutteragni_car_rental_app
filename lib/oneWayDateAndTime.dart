@@ -27,6 +27,7 @@ class _OneWayDateAndTimeState extends State<OneWayDateAndTime> {
   String? savedNumber;
   String? bookingId;
   String apiKey = "";
+  double minAdvanceHours = 5.0;
 
   // Theme Colors
   final Color primaryAmber = const Color(0xFFFFB300);
@@ -38,6 +39,25 @@ class _OneWayDateAndTimeState extends State<OneWayDateAndTime> {
   void initState() {
     super.initState();
     fetchApiKey();
+    fetchBookingConfig();
+  }
+
+  Future<void> fetchBookingConfig() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/get_booking_config.php'),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['min_advance_booking_hours'] != null) {
+          setState(() {
+            minAdvanceHours = (data['min_advance_booking_hours'] as num).toDouble();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching booking config: $e');
+    }
   }
 
   // --- LOGIC METHODS (Preserved) ---
@@ -168,8 +188,12 @@ class _OneWayDateAndTimeState extends State<OneWayDateAndTime> {
     if (time != null) {
       final pickedDateTime = DateTime(selectedDate!.year, selectedDate!.month,
           selectedDate!.day, time.hour, time.minute);
-      if (pickedDateTime.difference(DateTime.now()).inHours < 5) {
-        _showError("Pickup must be at least 5 hours from now");
+      final differenceInMinutes = pickedDateTime.difference(DateTime.now()).inMinutes;
+      if (differenceInMinutes < (minAdvanceHours * 60)) {
+        final hoursLabel = minAdvanceHours == minAdvanceHours.roundToDouble()
+            ? minAdvanceHours.toInt().toString()
+            : minAdvanceHours.toString();
+        _showError("Pickup must be at least $hoursLabel hours from now");
         return;
       }
       setState(() => selectedTime = time);
@@ -405,7 +429,7 @@ class _OneWayDateAndTimeState extends State<OneWayDateAndTime> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              "Note: For immediate bookings, pickup must be at least 5 hours from current time.",
+              "Note: For immediate bookings, pickup must be at least ${minAdvanceHours == minAdvanceHours.roundToDouble() ? minAdvanceHours.toInt() : minAdvanceHours} hours from current time.",
               style: GoogleFonts.poppins(
                   fontSize: 12, color: charcoal.withOpacity(0.7)),
             ),
