@@ -944,7 +944,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text("PAY ADVANCE ₹250",
+                  const Text("CONFIRM & BOOK",
                       style: TextStyle(
                           fontWeight: FontWeight.w900, letterSpacing: 1.2)),
                   const SizedBox(width: 10),
