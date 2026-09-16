@@ -10,7 +10,7 @@ import 'package:geolocator/geolocator.dart'; // Added for location detection
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:agni_car_rental/config/api_config.dart';
 import 'services/boundary_service.dart';
-import 'RazorpayPaymentPage.dart';
+import 'BookingCustomerMessagePage.dart';
 
 // --- MODELS ---
 class Car {
@@ -326,7 +326,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
         'total_amount': totalAmt.toString(),
         'vendor_amount': (selectedCar?.driverRate ?? 0).toString(),
         'agni_amount': (selectedCar?.agni_share ?? 0).toString(),
-        'payment_type': 'Advance',
+        'payment_type': 'Pay to Driver',
         'gst': showGSTField.toString(),
         'gst_number': gstNumberController.text,
         'business_name': businessNameController.text,
@@ -341,15 +341,10 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         if (responseData["success"] == true) {
-          String createdBookingId = responseData["booking_id"]?.toString() ?? '';
           Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                  builder: (context) => RazorpayPaymentPage(
-                        bookingId: createdBookingId,
-                        amount: 250.0,
-                        isFullPay: false,
-                      )));
+                  builder: (context) => const BookingCustomerMessagePage()));
         } else {
           _showSnack("Booking failed. Try again.");
         }
