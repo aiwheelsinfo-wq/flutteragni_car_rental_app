@@ -164,7 +164,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
     double rentoxEarning = dailyLimit * 2.0 * days; // ₹2 per KM
     double vendorEarning = (dailyLimit * 11.0 * days) + driverAllowance; // ₹11 per KM + allowance
     double calculatedCommission = _calculateAgentCommission();
-    double totalAdvance = baseAdvance + calculatedCommission;
+    double totalEstimatedFare = baseFare + driverAllowance + calculatedCommission;
 
     try {
       var url = Uri.parse("${ApiConfig.baseUrl}/saveBooking.php");
@@ -183,7 +183,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
         "city": cityController.text,
         "pincode": pincodeController.text,
         "agent_commission": calculatedCommission.toStringAsFixed(2),
-        "payment_type": "Advance",
+        "payment_type": "Pay to Driver",
         'gst': _showGSTField.toString(),
         'gst_number': gstController.text,
         'business_name': businessNameController.text,
@@ -191,22 +191,17 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
         'business_pincode': businessPincodeController.text,
         'base_charge': baseFare.toStringAsFixed(2),
         'driver_ta': driverAllowance.toStringAsFixed(2),
-        'total_amount': totalAdvance.toStringAsFixed(2),
+        'total_amount': totalEstimatedFare.toStringAsFixed(2),
         'agni_amount': rentoxEarning.toStringAsFixed(2),
         'vendor_amount': vendorEarning.toStringAsFixed(2),
       });
 
       var res = json.decode(response.body);
       if (res["success"] == true) {
-        String createdBookingId = res["booking_id"]?.toString() ?? '';
         Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-                builder: (_) => RazorpayPaymentPage(
-                      bookingId: createdBookingId,
-                      amount: baseAdvance,
-                      isFullPay: false,
-                    )));
+                builder: (context) => const BookingCustomerMessagePage()));
       } else {
         _showSnackBar(
             "Booking Failed: ${res['error'] ?? 'Unknown error'}", Colors.red);
@@ -567,7 +562,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
                   width: 20,
                   child: CircularProgressIndicator(
                       color: primaryAmber, strokeWidth: 2))
-              : Text("CONFIRM & PAY ADVANCE: ₹${baseAdvance.toStringAsFixed(0)}",
+              : Text("CONFIRM BOOKING",
                   style: GoogleFonts.poppins(
                       color: primaryAmber,
                       fontWeight: FontWeight.bold,
@@ -580,12 +575,12 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
   Widget _buildAdvancePaymentBreakdownCard() {
     double dailyLimit = widget.kmPerDay;
     int days = _calculateDays();
+    double baseFare = dailyLimit * widget.kmRate * days;
     double dailyAllowanceRate = 400.0;
     double driverAllowance = dailyAllowanceRate * days;
     bool isEarlyMorning = _isEarlyMorningTime(widget.departureTime);
-    double baseAdvance = dailyLimit * 4.0 * days; // ₹4 per KM advance
     double calculatedCommission = _calculateAgentCommission();
-    double totalAdvancePayable = baseAdvance + calculatedCommission;
+    double totalEst = baseFare + driverAllowance + (isEarlyMorning ? 300.0 : 0.0) + calculatedCommission;
 
     return Container(
       margin: const EdgeInsets.only(top: 20),
@@ -606,7 +601,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "ADVANCE PAYMENT BREAKDOWN",
+            "PAYMENT & FARE BREAKDOWN",
             style: GoogleFonts.poppins(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -632,8 +627,8 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
             ),
           ],
           const Divider(height: 16),
-          _buildBreakdownRow("Advance Collected Online", "₹${baseAdvance.toStringAsFixed(0)}",
-              subtitle: "(₹4.0/KM x ${dailyLimit.toStringAsFixed(0)} KM/day x $days Days)"),
+          _buildBreakdownRow("Advance Required", "₹0 (Free Booking)",
+              subtitle: "No online payment required now"),
           if (userType == "agent") ...[
             const Divider(height: 16),
             _buildBreakdownRow(
@@ -648,7 +643,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
             children: [
               Expanded(
                 child: Text(
-                  "Total Advance Payable Now",
+                  "Payable Now",
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -658,7 +653,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
               ),
               const SizedBox(width: 8),
               Text(
-                "₹${totalAdvancePayable.toStringAsFixed(0)}",
+                "₹0",
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
@@ -669,11 +664,11 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
           ),
           const SizedBox(height: 10),
           Text(
-            "*Remaining balance will be paid directly to the driver at the end of the trip.",
+            "*No advance payment required. Pay estimated ₹${totalEst.toStringAsFixed(0)} directly to your driver via Cash or UPI upon trip completion.",
             style: GoogleFonts.poppins(
-              fontSize: 10,
-              color: Colors.grey[600],
-              fontStyle: FontStyle.italic,
+              fontSize: 11,
+              color: Colors.green[900],
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 15),
