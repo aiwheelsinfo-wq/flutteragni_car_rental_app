@@ -930,27 +930,7 @@ class _BookingStatusPageState extends State<BookingStatusPage>
       status = 'Confirmed';
     }
     
-    // Try to get discount from the booking record (dynamic database discount),
-    // fallback to bookingDiscounts (5 trips Loyalty tracker)
-    double dbDiscountPercent = double.tryParse(booking['discount_percentage']?.toString() ?? '0') ?? 0.0;
-    int discount = dbDiscountPercent > 0 
-        ? dbDiscountPercent.toInt() 
-        : (bookingDiscounts[booking['id']] ?? 0);
-        
-    String discountName = booking['discount_name'] ?? 'Loyalty';
-    bool isToday =
-        booking['date'] == DateTime.now().toString().substring(0, 10);
-
     double finalPrice = double.tryParse(booking['total_amount']?.toString() ?? '0') ?? 0.0;
-    double discountedPrice = double.tryParse(booking['discounted_price']?.toString() ?? '0') ?? 0.0;
-    double savings = 0.0;
-    
-    if (discountedPrice > finalPrice) {
-      savings = discountedPrice - finalPrice;
-    } else if (discount > 0 && discount < 100) {
-      double originalPrice = finalPrice / (1 - (discount / 100.0));
-      savings = originalPrice - finalPrice;
-    }
 
     String registrationNumber = 'Allocating...';
     if (booking['vehicle_id'] != null && booking['vehicle_id'].toString().trim().isNotEmpty) {
@@ -1484,74 +1464,7 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                       ],
                     ],
                   ),
-                  if (discount > 0 || savings > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 15),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.purple.shade50, const Color(0xFFF3E5F5)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.purple.shade100, width: 1),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.purple.shade100,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.loyalty, color: Colors.purple, size: 20),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "$discountName Discount Applied!",
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.purple.shade900,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    "Saved ₹${savings.toStringAsFixed(0)} with your dynamic customer benefit",
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 11,
-                                      color: Colors.purple.shade700,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.purple,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                discount > 0 ? "-$discount%" : "-₹${savings.toStringAsFixed(0)}",
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ),
+
                 ],
               ),
             ),
