@@ -415,8 +415,22 @@ class _LocalTaxiState extends State<LocalTaxi> {
           "${targetDateTime.hour.toString().padLeft(2, '0')}:${targetDateTime.minute.toString().padLeft(2, '0')}";
       final dateStr =
           "${targetDateTime.year}-${targetDateTime.month.toString().padLeft(2, '0')}-${targetDateTime.day.toString().padLeft(2, '0')}";
-      final uri = Uri.parse(
-          "${ApiConfig.baseUrl}/selectCarCostList.php?tripType=Local%20Taxi&distance=${distance.toStringAsFixed(2)}&pickupTime=$timeStr&pickupDate=$dateStr");
+      String queryParams = "tripType=Local%20Taxi&distance=${distance.toStringAsFixed(2)}&pickupTime=$timeStr&pickupDate=$dateStr";
+      final pAddr = fullAddress.isNotEmpty ? fullAddress : fromController.text.trim();
+      final dAddr = toController.text.trim();
+      if (pAddr.isNotEmpty) {
+        queryParams += "&fromAddress=${Uri.encodeComponent(pAddr)}";
+      }
+      if (dAddr.isNotEmpty) {
+        queryParams += "&toAddress=${Uri.encodeComponent(dAddr)}";
+      }
+      if (fromLatLng != null) {
+        queryParams += "&fromLat=${fromLatLng!.latitude}&fromLon=${fromLatLng!.longitude}";
+      }
+      if (toLatLng != null) {
+        queryParams += "&toLat=${toLatLng!.latitude}&toLon=${toLatLng!.longitude}";
+      }
+      final uri = Uri.parse("${ApiConfig.baseUrl}/selectCarCostList.php?$queryParams");
 
       final response = await http.get(uri).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
@@ -448,6 +462,15 @@ class _LocalTaxiState extends State<LocalTaxi> {
               surgeTag = "Night Surge";
             }
 
+            final trafficSurcharge =
+                double.tryParse(item['traffic_surcharge']?.toString() ?? '0') ??
+                    0.0;
+            final trafficDelayMin =
+                int.tryParse(item['traffic_delay_min']?.toString() ?? '0') ?? 0;
+            final trafficStatus = item['traffic_status']?.toString() ?? 'normal';
+            final trafficStatusMsg =
+                item['traffic_status_message']?.toString() ?? '';
+
             parsedFares.add({
               "car_type": carType,
               "original_price": baseAmount,
@@ -456,6 +479,10 @@ class _LocalTaxiState extends State<LocalTaxi> {
               "surge_tag": surgeTag,
               "km_rate": kmRate,
               "gst_percent": gstPercent,
+              "traffic_surcharge": trafficSurcharge,
+              "traffic_delay_min": trafficDelayMin,
+              "traffic_status": trafficStatus,
+              "traffic_status_message": trafficStatusMsg,
             });
           }
 
@@ -679,6 +706,10 @@ class _LocalTaxiState extends State<LocalTaxi> {
     double finalAmount =
         (fareData["discounted_price"] as num?)?.toDouble() ?? 0.0;
     double tripDistance = currentCalculatedDistance ?? (kmLimit ?? 0.0);
+    double trafficSurcharge =
+        (fareData["traffic_surcharge"] as num?)?.toDouble() ?? 0.0;
+    int trafficDelayMin =
+        (fareData["traffic_delay_min"] as num?)?.toInt() ?? 0;
 
     Navigator.push(
       context,
@@ -690,6 +721,10 @@ class _LocalTaxiState extends State<LocalTaxi> {
             "car_type": selectedCar,
             "total_amount": finalAmount.toStringAsFixed(0),
             "distance": tripDistance.toStringAsFixed(1),
+            "traffic_surcharge": trafficSurcharge.toStringAsFixed(0),
+            "traffic_delay_min": trafficDelayMin.toString(),
+            "traffic_status_message":
+                fareData["traffic_status_message"]?.toString() ?? "",
             "from_lat": fromLatLng?.latitude.toString() ?? "",
             "from_lng": fromLatLng?.longitude.toString() ?? "",
             "to_lat": toLatLng?.latitude.toString() ?? "",
@@ -1231,8 +1266,36 @@ class _LocalTaxiState extends State<LocalTaxi> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Top indicator: Surge tag (if present)
-                      if (surgeTag.isNotEmpty)
+                      // Top indicator: Live traffic tag or Surge tag
+                      if (((car["traffic_surcharge"] as num?) ?? 0) > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.black.withOpacity(0.22)
+                                : const Color(0xFFFFF3CD),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                                color: isSelected
+                                    ? Colors.white.withOpacity(0.5)
+                                    : const Color(0xFFFFB300),
+                                width: 0.8),
+                          ),
+                          child: Text(
+                            "🚦 +${car['traffic_delay_min']}m (+₹${((car['traffic_surcharge'] as num?) ?? 0).toStringAsFixed(0)})",
+                            style: GoogleFonts.poppins(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected
+                                  ? Colors.white
+                                  : const Color(0xFFB45309),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        )
+                      else if (surgeTag.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 1.5),

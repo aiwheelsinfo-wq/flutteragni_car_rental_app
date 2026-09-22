@@ -316,6 +316,16 @@ class _CustomerRegistrationPageState extends State<CustomerRegistrationPage> {
         widget.bookingData!['car_type']?.toString().toUpperCase() ?? 'N/A';
     String totalAmount = widget.bookingData!['total_amount']?.toString() ?? '0';
     String distance = widget.bookingData!['distance']?.toString() ?? '0';
+    double trafficSurcharge = double.tryParse(
+            widget.bookingData?['traffic_surcharge']?.toString() ?? '0') ??
+        0.0;
+    int trafficDelayMin = int.tryParse(
+            widget.bookingData?['traffic_delay_min']?.toString() ?? '0') ??
+        0;
+    double totalFareNum = double.tryParse(totalAmount) ?? 0.0;
+    double standardFare = (totalFareNum > trafficSurcharge)
+        ? (totalFareNum - trafficSurcharge)
+        : totalFareNum;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -413,6 +423,52 @@ class _CustomerRegistrationPageState extends State<CustomerRegistrationPage> {
                       Icon(Icons.more_vert, color: Colors.white24, size: 15))),
           _buildTicketRow(Icons.location_on, widget.bookingData!['to_address'],
               Colors.redAccent),
+          if (trafficSurcharge > 0) ...[
+            const Divider(color: Colors.white24, height: 26),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("Standard Ride Fare",
+                    style: GoogleFonts.poppins(
+                        color: Colors.white70, fontSize: 11.5)),
+                Text("₹${standardFare.toStringAsFixed(0)}",
+                    style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.traffic_rounded,
+                        color: Color(0xFFFFB300), size: 14),
+                    const SizedBox(width: 5),
+                    Text("Live Traffic Surcharge (+$trafficDelayMin mins)",
+                        style: GoogleFonts.poppins(
+                            color: const Color(0xFFFFB300),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+                Text("+ ₹${trafficSurcharge.toStringAsFixed(0)}",
+                    style: GoogleFonts.poppins(
+                        color: const Color(0xFFFFB300),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              "Includes ₹${trafficSurcharge.toStringAsFixed(0)} traffic delay surcharge for driver petrol & time. First 5 mins delay are free.",
+              style: GoogleFonts.poppins(
+                  color: Colors.white54, fontSize: 9.5),
+            ),
+          ],
         ],
       ),
     );
