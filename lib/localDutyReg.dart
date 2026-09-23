@@ -340,6 +340,23 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
         }
       }
 
+      // Validate Drop Location Boundary: must be inside the same detected city boundary
+      if (dropLocationController.text.trim().isNotEmpty && toLat != null && toLng != null) {
+        final double dLat = double.tryParse(toLat!) ?? 0.0;
+        final double dLng = double.tryParse(toLng!) ?? 0.0;
+        final bool isDropInside = boundaryService.isPointInCity(
+          LatLng(dLat, dLng),
+          dropLocationController.text.trim(),
+          detectedCity,
+        );
+
+        if (!isDropInside) {
+          setState(() => isSubmitting = false);
+          _showOutsideDropBoundaryDialog((detectedCity['name'] ?? detectedCity['city_name'] ?? 'City').toString());
+          return;
+        }
+      }
+
       String formattedTime = "";
       if (selectedTime != null) {
         formattedTime =
@@ -455,6 +472,63 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
               ),
               child: Text(
                 "Change Pickup",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showOutsideDropBoundaryDialog(String cityName) {
+    final dropName = dropLocationController.text.split(',').first.trim().isNotEmpty
+        ? dropLocationController.text.split(',').first.trim()
+        : "Selected drop destination";
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.location_off_rounded, color: Colors.red, size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Drop Outside Boundary",
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Drop destination "$dropName" is outside the $cityName Local Duty boundary.\n\nLocal Duty trips must start and finish inside the same city boundary ($cityName). For trips traveling outside the city, please choose One-Way or Round-Trip.',
+            style: GoogleFonts.poppins(fontSize: 13, height: 1.45, color: darkText),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryAmber,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(
+                "Change Drop Location",
                 style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
               ),
               onPressed: () => Navigator.of(context).pop(),
@@ -673,12 +747,77 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
                           toLat = loc.lat.toString();
                           toLng = loc.lng.toString();
                         });
+
+                        // Check if drop location is inside the same boundary as pickup
+                        if (fromLat != null && fromLng != null) {
+                          final boundaryService = BoundaryService();
+                          final pCity = boundaryService.detectCity(
+                            LatLng(double.tryParse(fromLat!) ?? 0,
+                                double.tryParse(fromLng!) ?? 0),
+                            locationController.text,
+                          );
+                          if (pCity != null) {
+                            final isDropInside = boundaryService.isPointInCity(
+                              LatLng(loc.lat!, loc.lng!),
+                              desc,
+                              pCity,
+                            );
+                            if (!isDropInside) {
+                              _showOutsideDropBoundaryDialog((pCity['name'] ?? pCity['city_name'] ?? 'City').toString());
+                            }
+                          }
+                        }
                       }
                     } catch (e) {
                       debugPrint("Drop place details error: $e");
                     }
                   }
                 },
+              ),
+            ),
+          if (toLat != null &&
+              toLng != null &&
+              fromLat != null &&
+              fromLng != null &&
+              dropLocationController.text.isNotEmpty &&
+              BoundaryService().detectCity(
+                      LatLng(double.tryParse(fromLat!) ?? 0,
+                          double.tryParse(fromLng!) ?? 0),
+                      locationController.text) !=
+                  null &&
+              !BoundaryService().isPointInCity(
+                LatLng(double.tryParse(toLat!) ?? 0,
+                    double.tryParse(toLng!) ?? 0),
+                dropLocationController.text,
+                BoundaryService().detectCity(
+                    LatLng(double.tryParse(fromLat!) ?? 0,
+                        double.tryParse(fromLng!) ?? 0),
+                    locationController.text)!,
+              ))
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Colors.red, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Drop location must be inside ${(BoundaryService().detectCity(LatLng(double.tryParse(fromLat!) ?? 0, double.tryParse(fromLng!) ?? 0), locationController.text)?['name'] ?? BoundaryService().detectCity(LatLng(double.tryParse(fromLat!) ?? 0, double.tryParse(fromLng!) ?? 0), locationController.text)?['city_name'] ?? 'the city')} Local Duty zone',
+                      style: GoogleFonts.poppins(
+                        color: Colors.red.shade800,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
