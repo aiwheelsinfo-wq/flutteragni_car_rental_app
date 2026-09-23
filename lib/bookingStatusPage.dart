@@ -1329,69 +1329,193 @@ class _BookingStatusPageState extends State<BookingStatusPage>
 
             const SizedBox(height: 20),
 
-            // 3. OTP High-Visibility Bar (Upcoming Only)
+            // 3. OTP High-Visibility Bar (Upcoming Only: Start OTP before trip / Drop-off End OTP during In-Transit)
             if (!isPast && 
                 status != 'Cancelled' && 
                 status != 'Customer Cancelled' && 
                 status != 'Cancellation Requested') ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-                decoration: BoxDecoration(
-                  color: Colors.amber[400],
-                  // borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
+              Builder(
+                builder: (context) {
+                  final String startOtp = (booking['otp'] ?? '').toString();
+                  final String endOtp = (booking['end_otp'] ?? '').toString();
+                  final String bStatus = status.toString().toLowerCase();
+                  final bool isInTransit = bStatus == 'in-transit' || bStatus == 'started';
+                  final double gpsKm = double.tryParse((booking['gps_accumulated_km'] ?? '0').toString()) ?? 0.0;
+
+                  if (isInTransit && endOtp.isNotEmpty) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.vpn_key,
-                            size: 18, color: Colors.black87),
-                        const SizedBox(width: 8),
-                        Text("DRIVER OTP",
-                            style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w800,
-                                color: Colors.black87)),
-                      ],
-                    ),
-                    Text(booking['otp'].toString(),
-                        style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 24,
-                            letterSpacing: 4,
-                            color: Colors.black87)),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 15, 20, 0),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.shade100),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("⚠️", style: TextStyle(fontSize: 16)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          "For your safety, do not share the OTP with anyone until the driver arrives at your pickup location. The OTP should only be provided to the driver when you are ready to start the trip.",
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: Colors.red.shade900,
-                            fontWeight: FontWeight.w500,
-                            height: 1.4,
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF059669), Color(0xFF047857)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.flag_rounded,
+                                      size: 18, color: Colors.white),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text("DROP-OFF OTP",
+                                          style: GoogleFonts.poppins(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 13,
+                                              letterSpacing: 0.5,
+                                              color: Colors.white)),
+                                      Text("Required at destination",
+                                          style: GoogleFonts.poppins(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.white70)),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (gpsKm > 0) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      margin: const EdgeInsets.only(right: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        "📍 ${gpsKm.toStringAsFixed(1)} KM",
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  Text(endOtp,
+                                      style: GoogleFonts.poppins(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 24,
+                                          letterSpacing: 4,
+                                          color: const Color(0xFF34D399))),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 15, 20, 0),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFA7F3D0)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text("🛡️", style: TextStyle(fontSize: 16)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    "For your billing safety, share this completion OTP with the driver only after you reach your final destination.",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11,
+                                      color: const Color(0xFF065F46),
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  if (startOtp.isNotEmpty && !isInTransit) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.amber[400],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.vpn_key,
+                                      size: 18, color: Colors.black87),
+                                  const SizedBox(width: 8),
+                                  Text("DRIVER OTP",
+                                      style: GoogleFonts.poppins(
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.black87)),
+                                ],
+                              ),
+                              Text(startOtp,
+                                  style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 24,
+                                      letterSpacing: 4,
+                                      color: Colors.black87)),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 15, 20, 0),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.red.shade100),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text("⚠️", style: TextStyle(fontSize: 16)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    "For your safety, do not share the OTP with anyone until the driver arrives at your pickup location. The OTP should only be provided to the driver when you are ready to start the trip.",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11,
+                                      color: Colors.red.shade900,
+                                      fontWeight: FontWeight.w500,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return const SizedBox.shrink();
+                },
               ),
             ],
 

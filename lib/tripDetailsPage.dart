@@ -39,6 +39,8 @@ class TripDetailsPage extends StatelessWidget {
     final String bookingTime = booking['time'] ?? '';
     final String returnDate = booking['return_date'] ?? '';
     final String otp = (booking['otp'] ?? '').toString();
+    final String endOtp = (booking['end_otp'] ?? '').toString();
+    final double gpsKm = double.tryParse((booking['gps_accumulated_km'] ?? '0').toString()) ?? 0.0;
     final double totalAmount = double.tryParse(booking['total_amount']?.toString() ?? '0') ?? 0.0;
     final double paidAmount = double.tryParse(booking['paid_amount']?.toString() ?? '') ??
         (booking['payment_type'] == 'Advance' ? totalAmount : 0.0);
@@ -77,10 +79,15 @@ class TripDetailsPage extends StatelessWidget {
             _buildStatusHeader(status, bookingDate, bookingTime),
             const SizedBox(height: 16),
 
-            // 2. Driver OTP Card (if Upcoming & not cancelled)
-            if (!isPast && !_isCancelled(status) && otp.isNotEmpty) ...[
-              _buildOtpSecurityCard(context, otp),
-              const SizedBox(height: 16),
+            // 2. Driver OTP Card (Start OTP before trip / Completion OTP during In-Transit)
+            if (!isPast && !_isCancelled(status)) ...[
+              if ((status.toLowerCase() == 'in-transit' || status.toLowerCase() == 'started') && endOtp.isNotEmpty) ...[
+                _buildEndOtpSecurityCard(context, endOtp, gpsKm),
+                const SizedBox(height: 16),
+              ] else if (otp.isNotEmpty && status.toLowerCase() != 'in-transit' && status.toLowerCase() != 'started') ...[
+                _buildOtpSecurityCard(context, otp),
+                const SizedBox(height: 16),
+              ],
             ],
 
             // 3. Journey Route Details
@@ -203,6 +210,165 @@ class TripDetailsPage extends StatelessWidget {
                 fontWeight: FontWeight.w800,
                 color: statusColor,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEndOtpSecurityCard(BuildContext context, String endOtp, double gpsKm) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF059669), Color(0xFF047857)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF059669).withOpacity(0.35),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 14, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.flag_rounded, color: Colors.white, size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  "TRIP COMPLETION OTP",
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11.5,
+                                    color: Colors.white,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              "Required for drop-off verification",
+                              style: GoogleFonts.poppins(
+                                fontSize: 10.5,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (gpsKm > 0) ...[
+                              const SizedBox(height: 3),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  "📍 ${gpsKm.toStringAsFixed(1)} KM TRACKED",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 9.5,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: endOtp));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Completion OTP $endOtp copied!"),
+                        backgroundColor: darkCharcoal,
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          endOtp,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 20,
+                            letterSpacing: 2.5,
+                            color: const Color(0xFF34D399),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.copy_rounded, color: Colors.white, size: 14),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.92),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(20),
+                bottomRight: Radius.circular(20),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.shield_rounded, color: Color(0xFF059669), size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "For your billing safety, share this OTP with driver only after reaching final destination.",
+                    style: GoogleFonts.poppins(
+                      fontSize: 10.5,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
