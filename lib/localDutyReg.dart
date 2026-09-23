@@ -70,6 +70,7 @@ class LocalDutyBookingForm extends StatefulWidget {
 class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
   // Controllers
   final TextEditingController locationController = TextEditingController();
+  final TextEditingController dropLocationController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
   final TextEditingController timeController = TextEditingController();
   final TextEditingController nameController = TextEditingController();
@@ -100,11 +101,15 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
   String? savedNumber;
   String apiKey = "";
   List<AutocompletePrediction> predictions = [];
+  List<AutocompletePrediction> dropPredictions = [];
   late GooglePlace _googlePlace;
 
   String? selectedPlaceId;
+  String? selectedDropPlaceId;
   String? fromLat;
   String? fromLng;
+  String? toLat;
+  String? toLng;
 
   // Theme Colors
   final Color primaryAmber = const Color(0xFFFFB300);
@@ -237,6 +242,19 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
     }
   }
 
+  void _getDropLocationSuggestions(String input) async {
+    selectedDropPlaceId = null;
+    if (apiKey.isEmpty || input.trim().isEmpty) {
+      setState(() => dropPredictions = []);
+      return;
+    }
+    _googlePlace = GooglePlace(apiKey);
+    final result = await _googlePlace.autocomplete.get(input);
+    if (result != null && result.predictions != null) {
+      setState(() => dropPredictions = result.predictions!);
+    }
+  }
+
   void _submitForm() async {
     if (locationController.text.trim().isEmpty ||
         dateController.text.trim().isEmpty ||
@@ -297,6 +315,31 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
         return;
       }
 
+      // Optional Geocode for Drop Location
+      if (dropLocationController.text.trim().isNotEmpty && (toLat == null || toLng == null)) {
+        if (selectedDropPlaceId != null && apiKey.isNotEmpty) {
+          try {
+            _googlePlace = GooglePlace(apiKey);
+            final dDetails = await _googlePlace.details.get(selectedDropPlaceId!);
+            toLat = dDetails?.result?.geometry?.location?.lat?.toString();
+            toLng = dDetails?.result?.geometry?.location?.lng?.toString();
+          } catch (_) {}
+        } else {
+          try {
+            final dropGeocodeUrl = Uri.parse(
+                'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(dropLocationController.text.trim())}&key=$apiKey');
+            final dResp = await http.get(dropGeocodeUrl);
+            if (dResp.statusCode == 200) {
+              final dJson = json.decode(dResp.body);
+              if (dJson['status'] == 'OK') {
+                toLat = dJson['results'][0]['geometry']['location']['lat']?.toString();
+                toLng = dJson['results'][0]['geometry']['location']['lng']?.toString();
+              }
+            }
+          } catch (_) {}
+        }
+      }
+
       String formattedTime = "";
       if (selectedTime != null) {
         formattedTime =
@@ -314,6 +357,9 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
         'from_address': locationController.text,
         'fromLat': lat,
         'fromLng': lng,
+        'to_address': dropLocationController.text.trim(),
+        'toLat': toLat ?? '',
+        'toLng': toLng ?? '',
         'date': selectedDate?.toIso8601String() ?? '',
         'tripTime': formattedTime,
         'car_type': selectedCar?.name ?? '',
@@ -493,6 +539,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
       decoration: _cardBoxDecoration(),
       child: Column(
         children: [
+          // 🟢 1. Pickup Address
           TextField(
             controller: locationController,
             onChanged: _getLocationSuggestions,
@@ -537,7 +584,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: predictions.length,
               itemBuilder: (context, index) => ListTile(
-                leading: const Icon(Icons.place, color: Colors.grey),
+                leading: const Icon(Icons.place, color: Colors.green),
                 title: Text(predictions[index].description ?? '',
                     style: const TextStyle(fontSize: 13)),
                 onTap: () async {
@@ -569,6 +616,66 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
                       }
                     } catch (e) {
                       debugPrint("Place details error: $e");
+                    }
+                  }
+                },
+              ),
+            ),
+
+          const Divider(height: 1, indent: 16, endIndent: 16),
+
+          // 🔴 2. Drop Address (Optional)
+          TextField(
+            controller: dropLocationController,
+            onChanged: _getDropLocationSuggestions,
+            decoration: _inputDecoration("Drop Destination (Optional)", Icons.location_on).copyWith(
+              prefixIcon: const Icon(Icons.location_on, color: Colors.redAccent),
+              suffixIcon: dropLocationController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        dropLocationController.clear();
+                        setState(() {
+                          dropPredictions = [];
+                          toLat = null;
+                          toLng = null;
+                          selectedDropPlaceId = null;
+                        });
+                      },
+                    )
+                  : null,
+            ),
+          ),
+          if (dropPredictions.isNotEmpty)
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: dropPredictions.length,
+              itemBuilder: (context, index) => ListTile(
+                leading: const Icon(Icons.place, color: Colors.redAccent),
+                title: Text(dropPredictions[index].description ?? '',
+                    style: const TextStyle(fontSize: 13)),
+                onTap: () async {
+                  final desc = dropPredictions[index].description ?? '';
+                  final placeId = dropPredictions[index].placeId;
+                  dropLocationController.text = desc;
+                  selectedDropPlaceId = placeId;
+                  FocusScope.of(context).unfocus();
+                  setState(() => dropPredictions = []);
+
+                  if (placeId != null && apiKey.isNotEmpty) {
+                    try {
+                      _googlePlace = GooglePlace(apiKey);
+                      final details = await _googlePlace.details.get(placeId);
+                      final loc = details?.result?.geometry?.location;
+                      if (loc != null && loc.lat != null && loc.lng != null) {
+                        setState(() {
+                          toLat = loc.lat.toString();
+                          toLng = loc.lng.toString();
+                        });
+                      }
+                    } catch (e) {
+                      debugPrint("Drop place details error: $e");
                     }
                   }
                 },
