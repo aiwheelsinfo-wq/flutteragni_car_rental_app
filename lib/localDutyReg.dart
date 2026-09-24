@@ -24,6 +24,7 @@ class Car {
   final double agni_share;
   final double discountedPrice;
   final double discountPercentage;
+  final double gstPercent;
 
   Car({
     required this.name,
@@ -36,7 +37,23 @@ class Car {
     required this.agni_share,
     required this.discountedPrice,
     required this.discountPercentage,
+    this.gstPercent = 5.0,
   });
+
+  // Option 3: Calculate GST on top of the base package fare
+  double get gstAmount => ((base * gstPercent) / 100).roundToDouble();
+  double get totalWithGst => base + gstAmount;
+  double get originalGstAmount =>
+      ((discountedPrice * gstPercent) / 100).roundToDouble();
+  double get originalWithGst => discountedPrice + originalGstAmount;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Car && runtimeType == other.runtimeType && name == other.name;
+
+  @override
+  int get hashCode => name.hashCode;
 
   factory Car.fromJson(Map<String, dynamic> json) {
     return Car(
@@ -55,6 +72,7 @@ class Car {
           double.tryParse(json['discounted_price']?.toString() ?? '0') ?? 0,
       discountPercentage:
           double.tryParse(json['discount_percentage']?.toString() ?? '0') ?? 0,
+      gstPercent: double.tryParse(json['gstPercent']?.toString() ?? '5') ?? 5.0,
     );
   }
 }
@@ -365,9 +383,11 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
 
       double basePrice = selectedCar?.base ?? 0.0;
       double agentCommission = double.tryParse(commissionController.text) ?? 0.0;
-      double totalAmt = basePrice + agentCommission;
-      double agniShare = (totalAmt * 0.10);
-      double vendorEarnings = (totalAmt - agniShare).clamp(0.0, double.infinity);
+      double totalAmt = (selectedCar?.totalWithGst ?? basePrice) + agentCommission;
+      double gstAmt = basePrice * 0.05;
+      double platformComm = basePrice * 0.05; // 5% base commission
+      double agniShare = platformComm + gstAmt; // Total wallet deduction = platform fee + GST
+      double vendorEarnings = (basePrice - platformComm).clamp(0.0, double.infinity);
 
       final data = {
         'trip_type': 'Local-Duty',
@@ -388,7 +408,8 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
         'agent_commission': commissionController.text,
         'customer_mob': customerNumberController.text,
         'user_type': userType,
-        'total_amount': totalAmt.toString(),
+        'base_charge': basePrice.toStringAsFixed(2),
+        'total_amount': totalAmt.toStringAsFixed(2),
         'vendor_amount': vendorEarnings.toStringAsFixed(2),
         'agni_amount': agniShare.toStringAsFixed(2),
         'payment_type': 'Pay to Driver',
@@ -459,7 +480,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
             ],
           ),
           content: Text(
-            'Pickup location "$pickupName" is outside Rentox\'s service boundary.\n\nLocal Duty cabs are currently available within: $availableCities.',
+            'Pickup location "$pickupName" is outside Rentox\'s service boundary.\n\nHourly Rental cabs are currently available within: $availableCities.',
             style: GoogleFonts.poppins(fontSize: 13, height: 1.45, color: darkText),
           ),
           actions: [
@@ -516,7 +537,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
             ],
           ),
           content: Text(
-            'Drop destination "$dropName" is outside the $cityName Local Duty boundary.\n\nLocal Duty trips must start and finish inside the same city boundary ($cityName). For trips traveling outside the city, please choose One-Way or Round-Trip.',
+            'Drop destination "$dropName" is outside the $cityName Hourly Rental boundary.\n\nHourly Rental trips must start and finish inside the same city boundary ($cityName). For trips traveling outside the city, please choose One-Way or Round-Trip.',
             style: GoogleFonts.poppins(fontSize: 13, height: 1.45, color: darkText),
           ),
           actions: [
@@ -556,7 +577,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
         leading: IconButton(
             icon: Icon(Icons.arrow_back_ios, color: darkText, size: 20),
             onPressed: () => Navigator.pop(context)),
-        title: Text("Local Duty Booking",
+        title: Text("Hourly Rental Booking",
             style: GoogleFonts.poppins(
                 fontWeight: FontWeight.bold, fontSize: 18, color: darkText)),
       ),
@@ -809,7 +830,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Drop location must be inside ${(BoundaryService().detectCity(LatLng(double.tryParse(fromLat!) ?? 0, double.tryParse(fromLng!) ?? 0), locationController.text)?['name'] ?? BoundaryService().detectCity(LatLng(double.tryParse(fromLat!) ?? 0, double.tryParse(fromLng!) ?? 0), locationController.text)?['city_name'] ?? 'the city')} Local Duty zone',
+                      'Drop location must be inside ${(BoundaryService().detectCity(LatLng(double.tryParse(fromLat!) ?? 0, double.tryParse(fromLng!) ?? 0), locationController.text)?['name'] ?? BoundaryService().detectCity(LatLng(double.tryParse(fromLat!) ?? 0, double.tryParse(fromLng!) ?? 0), locationController.text)?['city_name'] ?? 'the city')} Hourly Rental zone',
                       style: GoogleFonts.poppins(
                         color: Colors.red.shade800,
                         fontSize: 11,
@@ -928,14 +949,28 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
       decoration: _cardBoxDecoration(),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: DropdownButtonFormField<Car>(
+        isExpanded: true,
         value: selectedCar,
         decoration: const InputDecoration(border: InputBorder.none),
         items: cars
             .map((car) => DropdownMenuItem<Car>(
                   value: car,
-                  child: Text(car.name.toUpperCase(),
-                      style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.bold, fontSize: 14)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(car.name.toUpperCase(),
+                          style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text(
+                        "₹${car.totalWithGst.toStringAsFixed(0)} (Incl. GST)",
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12.5,
+                          color: const Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ],
+                  ),
                 ))
             .toList(),
         onChanged: (val) => setState(() => selectedCar = val),
@@ -944,10 +979,12 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
   }
 
   Widget _buildFareBreakdown() {
-    final double originalPrice = selectedCar!.discountedPrice;
+    final double baseFare = selectedCar!.base;
+    final double gstAmount = selectedCar!.gstAmount;
+    final double originalPrice = selectedCar!.originalWithGst;
     final double agentCommission = double.tryParse(commissionController.text) ?? 0.0;
-    final double finalPrice = selectedCar!.base + agentCommission;
-    final double savings = originalPrice - selectedCar!.base;
+    final double finalPrice = selectedCar!.totalWithGst + agentCommission;
+    final double savings = originalPrice - selectedCar!.totalWithGst;
     final bool hasDiscount = savings > 0;
 
     return Container(
@@ -976,34 +1013,66 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Total Package Fare",
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade700,
-                            fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 4),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text("₹${finalPrice.toStringAsFixed(0)}",
-                            style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                color: darkText)),
-                        if (hasDiscount) ...[
-                          const SizedBox(width: 8),
-                          Text("₹${originalPrice.toStringAsFixed(0)}",
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Total Package Fare (GST Included)",
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 4),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text("₹${finalPrice.toStringAsFixed(0)}",
                               style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade500,
-                                  decoration: TextDecoration.lineThrough)),
-                        ]
-                      ],
-                    ),
-                  ],
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w900,
+                                  color: darkText)),
+                          if (hasDiscount) ...[
+                            const SizedBox(width: 8),
+                            Text("₹${originalPrice.toStringAsFixed(0)}",
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey.shade500,
+                                    decoration: TextDecoration.lineThrough)),
+                          ]
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // Option 3: Prominent Green GST Included badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(0xFF81C784),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_rounded,
+                                size: 12, color: Colors.green.shade800),
+                            const SizedBox(width: 4),
+                            Text(
+                              "Inclusive of ${selectedCar!.gstPercent.toInt()}% GST (₹${baseFare.toInt()} base + ₹${gstAmount.toInt()} GST)",
+                              style: GoogleFonts.poppins(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.green.shade800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 if (hasDiscount)
                   Container(
@@ -1036,13 +1105,20 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
               children: [
                 _fareRowDetail(Icons.inventory_2_outlined, "Included Package",
                     "${selectedCar!.packageHours.toStringAsFixed(0)} Hrs / ${selectedCar!.packageKm.toStringAsFixed(0)} Km"),
-                const Divider(height: 24),
+                const Divider(height: 20),
+                _fareRowDetail(Icons.receipt_outlined, "Base Package Fare",
+                    "₹${baseFare.toStringAsFixed(0)}"),
+                const Divider(height: 20),
+                _fareRowDetail(Icons.check_circle_outline, "GST (${selectedCar!.gstPercent.toInt()}%)",
+                    "+ ₹${gstAmount.toStringAsFixed(0)}",
+                    isGreen: true),
+                const Divider(height: 20),
                 _fareRowDetail(Icons.speed, "Extra KM Charge",
                     "₹${selectedCar!.extraKMAmount.toStringAsFixed(0)} / km"),
-                const Divider(height: 24),
+                const Divider(height: 20),
                 _fareRowDetail(Icons.more_time, "Extra Hr Charge",
                     "₹${selectedCar!.extraHoursAmount.toStringAsFixed(0)} / hr"),
-                const Divider(height: 24),
+                const Divider(height: 20),
                 _fareRowDetail(Icons.verified_user_outlined, "Driver Allowance",
                     "Included",
                     isGreen: true),

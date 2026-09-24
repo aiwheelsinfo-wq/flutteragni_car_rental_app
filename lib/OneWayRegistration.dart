@@ -824,7 +824,7 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                       child: _localBtn(
-                          "Local Duty",
+                          "Hourly Rental",
                           () => Navigator.push(
                               context,
                               MaterialPageRoute(

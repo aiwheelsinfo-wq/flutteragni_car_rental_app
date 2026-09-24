@@ -188,7 +188,9 @@ class _InvoicePageState extends State<InvoicePage> {
                 (data['parking_charge'] ?? '0').toString();
             invoiceData['toll_charge'] =
                 (data['toll_charge'] ?? '0').toString();
-            invoiceData['gstPercent'] = (data['gstPercent'] ?? '0').toString();
+            invoiceData['gstPercent'] = (data['gstPercent'] != null && data['gstPercent'].toString() != '0')
+                ? data['gstPercent'].toString()
+                : (data['trip_type'] == 'Local-taxi' ? '5' : (data['gstPercent'] ?? '0').toString());
             invoiceData['driver_allowance'] =
                 (data['driver_allowance'] ?? '0').toString();
             invoiceData['trip_type'] =
@@ -434,7 +436,15 @@ class _InvoicePageState extends State<InvoicePage> {
     var maxKm;
     double kmRate =
         double.tryParse(invoiceData['kmRate']?.toString() ?? '') ?? 0.0;
-    double gstPercent = double.parse(invoiceData['gstPercent'].toString());
+    final isLocalTaxi = (invoiceData['trip_type'] ?? '')
+        .toString()
+        .toLowerCase()
+        .replaceAll(' ', '-')
+        .contains('local-taxi');
+    double gstPercent = double.tryParse(invoiceData['gstPercent']?.toString() ?? '') ?? 0.0;
+    if (gstPercent <= 0 && isLocalTaxi) {
+      gstPercent = 5.0;
+    }
     bool isIntraState = true;
     String custGst = (invoiceData['gst_number'] ?? '').trim();
     if (custGst.isNotEmpty && custGst != 'Not Generated' && custGst != 'None') {
@@ -575,16 +585,25 @@ class _InvoicePageState extends State<InvoicePage> {
 
       driver_allowanceVal = (distance < 200) ? 300 : 400;
 
-      baceAmount = invoiceData['total_amount'] != '0'
+      double rawTotal = invoiceData['total_amount'] != '0'
           ? double.parse(invoiceData['total_amount'].toString())
           : (distance * kmRate) + driver_allowanceVal + agent_commission;
 
+      // Option A: rawTotal (total_amount) is already GST inclusive.
+      // Back-calculate pre-tax base so (baceAmount + gst + surcharges) == rawTotal
+      double nonTaxSurcharges = parking_charge + toll_charge + permit_charge;
+      double inclusiveBase = (rawTotal - nonTaxSurcharges) > 0 ? (rawTotal - nonTaxSurcharges) : rawTotal;
+
+      if (gstPercent > 0) {
+        baceAmount = inclusiveBase / (1 + (gstPercent / 100));
+        gst = inclusiveBase - baceAmount;
+      } else {
+        baceAmount = inclusiveBase;
+        gst = 0.0;
+      }
+
       double totalbeforeGst = baceAmount;
-
-      gst = baceAmount * gstPercent / 100;
-      netTotal =
-          baceAmount + gst + parking_charge + toll_charge + permit_charge;
-
+      netTotal = baceAmount + gst + nonTaxSurcharges;
       base_charge = baceAmount;
 
       baceAmount = double.parse(baceAmount.toStringAsFixed(2));
@@ -594,13 +613,30 @@ class _InvoicePageState extends State<InvoicePage> {
       driver_allowance = driver_allowanceVal.toString();
     }
 
-    final isLocalTaxi = (invoiceData['trip_type'] ?? '')
-        .toString()
-        .toLowerCase()
-        .replaceAll(' ', '-')
-        .contains('local-taxi');
     if (isLocalTaxi) {
-      netTotal = double.tryParse(invoiceData['total_amount']?.toString() ?? '0') ?? 0.0;
+      double rawTotal = double.tryParse(invoiceData['total_amount']?.toString() ?? '0') ?? 0.0;
+      double nonTaxSurcharges = parking_charge + toll_charge + permit_charge;
+      double inclusiveBase = (rawTotal - nonTaxSurcharges) > 0 ? (rawTotal - nonTaxSurcharges) : rawTotal;
+
+      double parsedBase = double.tryParse(invoiceData['base_charge']?.toString() ?? '') ?? 0.0;
+      if (parsedBase > 0) {
+        baceAmount = parsedBase;
+      } else if (gstPercent > 0) {
+        baceAmount = inclusiveBase / (1 + (gstPercent / 100));
+      } else {
+        baceAmount = inclusiveBase;
+      }
+
+      if (gstPercent > 0) {
+        gst = inclusiveBase - baceAmount!;
+      } else {
+        gst = 0.0;
+      }
+
+      netTotal = baceAmount! + gst! + nonTaxSurcharges;
+      baceAmount = double.parse(baceAmount!.toStringAsFixed(2));
+      gst = double.parse(gst!.toStringAsFixed(2));
+      netTotal = double.parse(netTotal!.toStringAsFixed(2));
     }
 
     final double advancedAmount =
@@ -778,7 +814,8 @@ class _InvoicePageState extends State<InvoicePage> {
                                       fontSize: 8.5,
                                       fontWeight: pw.FontWeight.bold,
                                       color: PdfColor.fromHex('#64748B'))),
-                              pw.Text("${invoiceData['trip_type']}",
+                              pw.Text(
+                                  "${(invoiceData['trip_type'] ?? '') == 'Local-Duty' ? 'Hourly Rental' : (invoiceData['trip_type'] ?? '')}",
                                   style: pw.TextStyle(
                                       fontSize: 9.5,
                                       fontWeight: pw.FontWeight.bold,
@@ -1072,13 +1109,13 @@ class _InvoicePageState extends State<InvoicePage> {
                     ],
                     if (isLocalTaxi) ...[
                       _buildModernPdfTableRow(
-                        'Local Taxi Fare',
+                        (gst ?? 0) > 0 ? 'Local Taxi Base Fare' : 'Local Taxi Fare',
                         (totalKm != null && totalKm > 0)
                             ? '${_formatNumber(totalKm)} Km'
                             : ((invoiceData['distance'] != null && invoiceData['distance'] != '0')
                                 ? '${invoiceData['distance']} Km'
                                 : ''),
-                        '${_formatNumber(netTotal)}',
+                        '${_formatNumber(baceAmount ?? netTotal)}',
                       ),
                     ],
                     if (!isLocalTaxi) ...[
@@ -1100,22 +1137,23 @@ class _InvoicePageState extends State<InvoicePage> {
                           '${(baceAmount! + parking_charge!)}',
                           isAlt: true),
                     ],
-                    if (invoiceData['trip_type'] != 'Local-taxi') ...[
+                    if ((gst ?? 0) > 0) ...[
                       if (isIntraState) ...[
                         _buildModernPdfTableRow(
                             'CGST ${_formatNumber(gstPercent / 2)}%',
                             '',
-                            '${(gst! / 2)}'),
+                            _formatNumber(gst! / 2)),
                         _buildModernPdfTableRow(
                             'SGST ${_formatNumber(gstPercent / 2)}%',
                             '',
-                            '${(gst! / 2)}',
+                            _formatNumber(gst! / 2),
                             isAlt: true),
                       ] else ...[
                         _buildModernPdfTableRow(
                             'IGST ${_formatNumber(gstPercent)}%',
                             '',
-                            '$gst'),
+                            _formatNumber(gst!),
+                            isAlt: true),
                       ],
                     ],
                   ],
@@ -1569,7 +1607,8 @@ class _InvoicePageState extends State<InvoicePage> {
                   Text("Date: ${invoiceData['invoieceDate']}",
                       style: GoogleFonts.poppins(
                           fontSize: 11, color: const Color(0xFF64748B))),
-                  Text("Trip: ${invoiceData['trip_type']}",
+                  Text(
+                      "Trip: ${(invoiceData['trip_type'] ?? '') == 'Local-Duty' ? 'Hourly Rental' : (invoiceData['trip_type'] ?? '')}",
                       style: GoogleFonts.poppins(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -1711,7 +1750,15 @@ class _InvoicePageState extends State<InvoicePage> {
     var maxKm;
     double kmRate =
         double.tryParse(invoiceData['kmRate']?.toString() ?? '') ?? 0.0;
-    double gstPercent = double.parse(invoiceData['gstPercent'].toString());
+    final isLocalTaxi = (invoiceData['trip_type'] ?? '')
+        .toString()
+        .toLowerCase()
+        .replaceAll(' ', '-')
+        .contains('local-taxi');
+    double gstPercent = double.tryParse(invoiceData['gstPercent']?.toString() ?? '') ?? 0.0;
+    if (gstPercent <= 0 && isLocalTaxi) {
+      gstPercent = 5.0;
+    }
     bool isIntraState = true;
     String custGst = (invoiceData['gst_number'] ?? '').trim();
     if (custGst.isNotEmpty && custGst != 'Not Generated' && custGst != 'None') {
@@ -1852,16 +1899,25 @@ class _InvoicePageState extends State<InvoicePage> {
 
       driver_allowanceVal = (distance < 200) ? 300 : 400;
 
-      baceAmount = invoiceData['total_amount'] != '0'
+      double rawTotal = invoiceData['total_amount'] != '0'
           ? double.parse(invoiceData['total_amount'].toString())
           : (distance * kmRate) + driver_allowanceVal + agent_commission;
 
+      // Option A: rawTotal (total_amount) is already GST inclusive.
+      // Back-calculate pre-tax base so (baceAmount + gst + surcharges) == rawTotal
+      double nonTaxSurcharges = parking_charge + toll_charge + permit_charge;
+      double inclusiveBase = (rawTotal - nonTaxSurcharges) > 0 ? (rawTotal - nonTaxSurcharges) : rawTotal;
+
+      if (gstPercent > 0) {
+        baceAmount = inclusiveBase / (1 + (gstPercent / 100));
+        gst = inclusiveBase - baceAmount;
+      } else {
+        baceAmount = inclusiveBase;
+        gst = 0.0;
+      }
+
       double totalbeforeGst = baceAmount;
-
-      gst = baceAmount * gstPercent / 100;
-      netTotal =
-          baceAmount + gst + parking_charge + toll_charge + permit_charge;
-
+      netTotal = baceAmount + gst + nonTaxSurcharges;
       base_charge = baceAmount;
 
       baceAmount = double.parse(baceAmount.toStringAsFixed(2));
@@ -1871,13 +1927,30 @@ class _InvoicePageState extends State<InvoicePage> {
       driver_allowance = driver_allowanceVal.toString();
     }
 
-    final isLocalTaxi = (invoiceData['trip_type'] ?? '')
-        .toString()
-        .toLowerCase()
-        .replaceAll(' ', '-')
-        .contains('local-taxi');
     if (isLocalTaxi) {
-      netTotal = double.tryParse(invoiceData['total_amount']?.toString() ?? '0') ?? 0.0;
+      double rawTotal = double.tryParse(invoiceData['total_amount']?.toString() ?? '0') ?? 0.0;
+      double nonTaxSurcharges = parking_charge + toll_charge + permit_charge;
+      double inclusiveBase = (rawTotal - nonTaxSurcharges) > 0 ? (rawTotal - nonTaxSurcharges) : rawTotal;
+
+      double parsedBase = double.tryParse(invoiceData['base_charge']?.toString() ?? '') ?? 0.0;
+      if (parsedBase > 0) {
+        baceAmount = parsedBase;
+      } else if (gstPercent > 0) {
+        baceAmount = inclusiveBase / (1 + (gstPercent / 100));
+      } else {
+        baceAmount = inclusiveBase;
+      }
+
+      if (gstPercent > 0) {
+        gst = inclusiveBase - baceAmount!;
+      } else {
+        gst = 0.0;
+      }
+
+      netTotal = baceAmount! + gst! + nonTaxSurcharges;
+      baceAmount = double.parse(baceAmount!.toStringAsFixed(2));
+      gst = double.parse(gst!.toStringAsFixed(2));
+      netTotal = double.parse(netTotal!.toStringAsFixed(2));
     }
 
     final double advancedAmount =
@@ -2000,13 +2073,13 @@ class _InvoicePageState extends State<InvoicePage> {
                 ],
                 if (isLocalTaxi) ...[
                   _buildModernTableRow(
-                    'Local Taxi Fare',
+                    (gst ?? 0) > 0 ? 'Local Taxi Base Fare' : 'Local Taxi Fare',
                     (totalKm > 0)
                         ? '${_formatNumber(totalKm)} Km'
                         : ((invoiceData['distance'] != null && invoiceData['distance'] != '0')
                             ? '${invoiceData['distance']} Km'
                             : ''),
-                    '${_formatNumber(netTotal)}',
+                    '${_formatNumber(baceAmount ?? netTotal)}',
                   ),
                 ],
                 if (!isLocalTaxi) ...[
@@ -2027,20 +2100,20 @@ class _InvoicePageState extends State<InvoicePage> {
                       '${(baceAmount! + parking_charge!)}',
                       isAlt: true),
                 ],
-                if (invoiceData['trip_type'] != 'Local-taxi') ...[
+                if ((gst ?? 0) > 0) ...[
                   if (isIntraState) ...[
                     _buildModernTableRow(
                         'CGST ${_formatNumber(gstPercent / 2)}%',
                         '',
-                        '${(gst! / 2)}'),
+                        _formatNumber(gst! / 2)),
                     _buildModernTableRow(
                         'SGST ${_formatNumber(gstPercent / 2)}%',
                         '',
-                        '${(gst! / 2)}',
+                        _formatNumber(gst! / 2),
                         isAlt: true),
                   ] else ...[
                     _buildModernTableRow('IGST ${_formatNumber(gstPercent)}%',
-                        '', '$gst'),
+                        '', _formatNumber(gst!)),
                   ],
                 ],
               ],

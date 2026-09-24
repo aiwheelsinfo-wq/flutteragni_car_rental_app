@@ -12,6 +12,7 @@ class Car {
   final double gstPercent;
   final double driverAllowance;
   final double kmPerDay;
+  final String imageUrl;
 
   Car({
     required this.name,
@@ -19,20 +20,18 @@ class Car {
     required this.gstPercent,
     required this.driverAllowance,
     required this.kmPerDay,
+    this.imageUrl = '',
   });
 
   factory Car.fromJson(Map<String, dynamic> json) {
     return Car(
-      name: json['carType'],
-      price: double.tryParse(json['kmRate'].toString()) ?? 0.0,
-      gstPercent: double.tryParse(json['gstPercent'].toString()) ?? 0.0,
+      name: json['carType']?.toString() ?? '',
+      price: double.tryParse(json['kmRate']?.toString() ?? '0') ?? 0.0,
+      gstPercent: double.tryParse(json['gstPercent']?.toString() ?? '5') ?? 5.0,
       driverAllowance:
-          (double.tryParse(json['driverAllowance'].toString()) == 300.0 ||
-                  double.tryParse(json['driverAllowance'].toString()) == null ||
-                  double.tryParse(json['driverAllowance'].toString()) == 0.0)
-              ? 400.0
-              : (double.tryParse(json['driverAllowance'].toString()) ?? 400.0),
-      kmPerDay: double.tryParse(json['kmPerDay'].toString()) ?? 0.0,
+          double.tryParse(json['driverAllowance']?.toString() ?? '400') ?? 400.0,
+      kmPerDay: double.tryParse(json['kmPerDay']?.toString() ?? '0') ?? 0.0,
+      imageUrl: json['imageUrl']?.toString() ?? json['image_url']?.toString() ?? '',
     );
   }
 }
@@ -45,11 +44,11 @@ class Roundtripcarselection extends StatefulWidget {
 }
 
 class _RoundtripcarselectionState extends State<Roundtripcarselection> {
-  // Theme Colors
+  // Theme Colors matching Rentox design system
   final Color primaryAmber = const Color(0xFFFFB300);
   final Color secondaryYellow = const Color(0xFFFFD54F);
-  final Color darkBg = const Color(0xFF121212);
-  final Color cardBg = Colors.white;
+  final Color darkCanvas = const Color(0xFF1A1A1A);
+  final Color surfaceLight = const Color(0xFFF8F9FA);
 
   List<Car> cars = [];
   bool isLoading = true;
@@ -57,6 +56,9 @@ class _RoundtripcarselectionState extends State<Roundtripcarselection> {
   final FlutterSecureStorage secureStorage = FlutterSecureStorage();
   String? savedNumber;
   int? discount;
+
+  int selectedCarIndex = 0;
+  String selectedCategoryFilter = "All";
 
   @override
   void didChangeDependencies() {
@@ -103,303 +105,626 @@ class _RoundtripcarselectionState extends State<Roundtripcarselection> {
     }
   }
 
+  // --- Helper for Car Details ---
+  Map<String, dynamic> _getCarSpecs(String carName) {
+    String name = carName.toLowerCase();
+    if (name.contains("hatchback")) {
+      return {
+        "seats": "4",
+        "bags": "2",
+        "type": "Economy",
+        "models": "WagonR, Swift or similar",
+      };
+    } else if (name.contains("sedan") || name.contains("dzire")) {
+      return {
+        "seats": "4",
+        "bags": "3",
+        "type": "Comfort",
+        "models": "Dzire, Etios or similar",
+      };
+    } else if (name.contains("crysta")) {
+      return {
+        "seats": "7",
+        "bags": "4",
+        "type": "Luxury SUV",
+        "models": "Innova Crysta or similar",
+      };
+    } else if (name.contains("suv") ||
+        name.contains("ertiga") ||
+        name.contains("innova")) {
+      return {
+        "seats": "6",
+        "bags": "3",
+        "type": "Family SUV",
+        "models": "Ertiga, Carens or similar",
+      };
+    }
+    return {
+      "seats": "4",
+      "bags": "2",
+      "type": "Standard",
+      "models": "Standard Cab",
+    };
+  }
+
+  String _formatCarName(String raw) {
+    if (raw.trim().isEmpty) return "Cab";
+    final trimmed = raw.trim();
+    if (trimmed.toUpperCase() == "SUV") return "SUV";
+    final words = trimmed.split(' ');
+    return words.map((w) {
+      if (w.isEmpty) return '';
+      if (w.toUpperCase() == "SUV") return "SUV";
+      if (w.length == 1) return w.toUpperCase();
+      return w[0].toUpperCase() + w.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
+  List<Car> get _filteredCars {
+    List<Car> list = List.from(cars);
+
+    if (selectedCategoryFilter != "All") {
+      final f = selectedCategoryFilter.toLowerCase();
+      list = list.where((car) {
+        final name = car.name.toLowerCase();
+        if (f == "sedan") {
+          return name.contains("sedan") || name.contains("dzire") || name.contains("etios");
+        } else if (f == "suv") {
+          return name.contains("suv") || name.contains("ertiga") || name.contains("innova") || name.contains("crysta");
+        } else if (f == "hatchback") {
+          return name.contains("hatchback") || name.contains("wagonr") || name.contains("swift");
+        } else if (f == "4 seater") {
+          final specs = _getCarSpecs(car.name);
+          return specs['seats'].toString().contains("4");
+        } else if (f == "6+ seater") {
+          final specs = _getCarSpecs(car.name);
+          return specs['seats'].toString().contains("6") || specs['seats'].toString().contains("7");
+        }
+        return name.contains(f);
+      }).toList();
+    }
+
+    return list;
+  }
+
   @override
   Widget build(BuildContext context) {
     final Map<String, dynamic> args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>;
+        (ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?) ?? {};
     final String from = args['from'] ?? '';
     final String to = args['to'] ?? '';
     final String departureDate = args['departure_date'] ?? '';
     final String returnDate = args['return_date'] ?? '';
 
+    final displayCars = _filteredCars;
+
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 238, 232, 219),
+      backgroundColor: surfaceLight,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: darkBg,
+        backgroundColor: Colors.white,
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          icon: Icon(Icons.arrow_back_ios_new, color: darkCanvas, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          "Choose Your Ride",
-          style: GoogleFonts.poppins(
-              color: Colors.white, fontWeight: FontWeight.bold),
+        title: Column(
+          children: [
+            Text(
+              "Select Your Ride",
+              style: GoogleFonts.montserrat(
+                color: darkCanvas,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            if (from.isNotEmpty && to.isNotEmpty)
+              Text(
+                departureDate.isNotEmpty && returnDate.isNotEmpty
+                    ? "$from → $to ($departureDate - $returnDate)"
+                    : "$from → $to",
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+          ],
         ),
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator(color: primaryAmber))
-          : SingleChildScrollView(
-              child: Column(
-                children: [
-                  _buildTripItineraryHeader(
-                      from, to, departureDate, returnDate),
-                  if (message) _buildPromoBanner(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 20),
-                        Text(
-                          "Available Options",
-                          style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: darkBg),
+          : Column(
+              children: [
+                _buildFilterBar(),
+                if (message && discount != null && discount! > 0)
+                  _buildPromoBanner(),
+                Expanded(
+                  child: displayCars.isEmpty
+                      ? _buildNoMatchingFilterMessage()
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: displayCars.length + 1, // +1 for Safe Travel footer
+                          itemBuilder: (context, index) {
+                            if (index == displayCars.length) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 10, bottom: 20),
+                                child: _buildSafeTravelInfo(),
+                              );
+                            }
+
+                            final car = displayCars[index];
+                            return _buildModernCarCard(car, args, index);
+                          },
                         ),
-                        const SizedBox(height: 10),
-                        ...cars.map((car) => _buildCarCard(car, args)).toList(),
-                        const SizedBox(height: 30),
-                        _buildSafeTravelInfo(),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
     );
   }
 
-  Widget _buildTripItineraryHeader(
-      String from, String to, String dep, String ret) {
+  Widget _buildFilterBar() {
+    final List<Map<String, dynamic>> filters = [
+      {"label": "All", "icon": Icons.apps_rounded},
+      {"label": "Sedan", "icon": Icons.directions_car_rounded},
+      {"label": "SUV", "icon": Icons.airport_shuttle_rounded},
+      {"label": "Hatchback", "icon": Icons.electric_car_rounded},
+      {"label": "4 Seater", "icon": Icons.people_alt_rounded},
+      {"label": "6+ Seater", "icon": Icons.groups_rounded},
+    ];
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: darkBg,
-        borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.route, color: Colors.amber, size: 40),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("$from → $to",
-                    style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text("Dates: $dep to $ret",
-                    style: GoogleFonts.poppins(
-                        color: Colors.white70, fontSize: 12)),
-              ],
-            ),
-          ),
-        ],
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Row(
+          children: filters.map((f) {
+            final String label = f['label'];
+            final IconData icon = f['icon'];
+            final bool isSelected = (selectedCategoryFilter == label);
+
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  selectedCategoryFilter = label;
+                  selectedCarIndex = 0;
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isSelected ? darkCanvas : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? darkCanvas : Colors.grey.shade300,
+                    width: 1.1,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.12),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          )
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      icon,
+                      size: 13,
+                      color: isSelected ? Colors.white : Colors.grey.shade700,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      label,
+                      style: GoogleFonts.poppins(
+                        fontSize: 11.5,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        color: isSelected ? Colors.white : Colors.grey.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
 
   Widget _buildPromoBanner() {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(15),
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [primaryAmber, secondaryYellow]),
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-              color: primaryAmber.withOpacity(0.3),
-              blurRadius: 10,
-              offset: const Offset(0, 5))
-        ],
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFFD54F)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.stars, color: Colors.white, size: 30),
-          const SizedBox(width: 15),
+          const Icon(Icons.stars_rounded, color: Color(0xFFFF8F00), size: 18),
+          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Special Loyalty Discount!",
-                    style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.bold, fontSize: 14)),
-                Text("You are getting $discount% OFF on this booking.",
-                    style: GoogleFonts.poppins(
-                        fontSize: 12, fontWeight: FontWeight.w500)),
-              ],
+            child: Text(
+              "Special Loyalty Discount: You are getting $discount% OFF on this booking!",
+              style: GoogleFonts.poppins(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFFE65100),
+              ),
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCarCard(Car car, Map args) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => RoundTripShowBill(
-              from: args['from'],
-              to: args['to'],
-              departureDate: args['departure_date'],
-              departureTime: args['departure_time'],
-              returnDate: args['return_date'],
-              returnTime: args['return_time'],
-              selectedCar: car.name,
-              kmPerDay: car.kmPerDay,
-              kmRate: car.price,
-              driverAllowance: car.driverAllowance,
-              gstPercent: car.gstPercent,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4))
-          ],
-        ),
+  Widget _buildNoMatchingFilterMessage() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(30),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Container(
-                    height: 60,
-                    width: 60,
-                    decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
-                        borderRadius: BorderRadius.circular(12)),
-                    child: Icon(Icons.directions_car,
-                        color: primaryAmber, size: 35),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(car.name,
-                            style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.bold, fontSize: 18)),
-                        Text("${car.kmPerDay} KM/day limit",
-                            style: GoogleFonts.poppins(
-                                fontSize: 12, color: Colors.grey)),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text("₹${car.price}",
-                          style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 22,
-                              color: darkBg)),
-                      Text("/KM",
-                          style: GoogleFonts.poppins(
-                              fontSize: 12, color: Colors.grey)),
-                    ],
-                  )
-                ],
+            Icon(Icons.directions_car_outlined, size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            Text(
+              "No $selectedCategoryFilter cabs available",
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(20)),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () => setState(() => selectedCategoryFilter = "All"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryAmber,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
-              child: Column(
-                children: [
-                  _rowDetail(Icons.person, "Driver Allowance",
-                      "₹${car.driverAllowance}/day"),
-                  const Divider(),
-                  _rowDetail(
-                      Icons.receipt_long, "GST", "${car.gstPercent}%"),
-                  const Divider(),
-                  _rowDetail(
-                      Icons.info_outline, "Terms", "Garage-to-Garage billing"),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _badge("Sanitized"),
-                      _badge("Professional Driver"),
-                      _badge("24/7 Support"),
-                    ],
-                  )
-                ],
-              ),
-            )
+              child: const Text("Show All Cars", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _rowDetail(IconData icon, String title, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.grey),
-        const SizedBox(width: 8),
-        Text(title,
-            style:
-                GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade700)),
-        const Spacer(),
-        Text(value,
-            style: GoogleFonts.poppins(
-                fontSize: 12, fontWeight: FontWeight.bold, color: darkBg)),
-      ],
-    );
-  }
+  Widget _buildModernCarCard(Car car, Map args, int index) {
+    final specs = _getCarSpecs(car.name);
+    final bool isSelected = (selectedCarIndex == index);
+    final String exactCarName = _formatCarName(car.name);
 
-  Widget _badge(String text) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-          color: Colors.green.shade50, borderRadius: BorderRadius.circular(6)),
-      child: Text(text,
-          style: const TextStyle(
-              color: Colors.green, fontSize: 9, fontWeight: FontWeight.bold)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isSelected ? const Color(0xFF1A1A1A) : Colors.grey.shade200,
+          width: isSelected ? 2.0 : 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isSelected ? 0.07 : 0.03),
+            blurRadius: isSelected ? 12 : 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            setState(() => selectedCarIndex = index);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RoundTripShowBill(
+                  from: args['from'] ?? '',
+                  to: args['to'] ?? '',
+                  departureDate: args['departure_date'] ?? '',
+                  departureTime: args['departure_time'] ?? '',
+                  returnDate: args['return_date'] ?? '',
+                  returnTime: args['return_time'] ?? '',
+                  selectedCar: car.name,
+                  kmPerDay: car.kmPerDay,
+                  kmRate: car.price,
+                  driverAllowance: car.driverAllowance,
+                  gstPercent: car.gstPercent,
+                ),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 1. Top Section: Image + Info + Rate
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Left: Vehicle image
+                    Stack(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey.shade100),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: car.imageUrl.isNotEmpty
+                              ? Image.network(
+                                  car.imageUrl,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) => Icon(
+                                    Icons.directions_car_filled_rounded,
+                                    color: primaryAmber,
+                                    size: 36,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.directions_car_filled_rounded,
+                                  color: primaryAmber,
+                                  size: 36,
+                                ),
+                        ),
+                        Positioned(
+                          top: 2,
+                          right: 2,
+                          child: Icon(
+                            Icons.ac_unit_rounded,
+                            size: 11,
+                            color: Colors.blueGrey.shade400,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Middle Column: Exact Name, Models, Min KM
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Line 1: Exact Car Name + Seats
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  exactCarName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.montserrat(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15.5,
+                                    color: darkCanvas,
+                                    letterSpacing: 0.1,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.person, size: 13, color: Colors.grey.shade700),
+                                  Text(
+                                    " ${specs['seats']}",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+
+                          // Line 2: Models
+                          Text(
+                            specs['models'] ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11.5,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+
+                          // Line 3: Min KM/day
+                          Text(
+                            "Min ${car.kmPerDay.toInt()} KM/day • AC ❄️",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Right Column: Rate / KM & GST Badge
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              "₹${car.price.toStringAsFixed(0)}",
+                              style: GoogleFonts.montserrat(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: darkCanvas,
+                              ),
+                            ),
+                            Text(
+                              "/KM",
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: const Color(0xFF81C784),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 9.5,
+                                color: Colors.green.shade800,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                car.gstPercent > 0 ? "GST ${car.gstPercent.toInt()}%" : "GST Included",
+                                style: GoogleFonts.poppins(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green.shade800,
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                // 2. Full-Width Bottom Strip for Driver Allowance (Zero Overflow)
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1), // soft amber
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFFFFE082),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.badge_outlined,
+                        size: 13,
+                        color: Color(0xFFE65100),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        "Driver Allowance: ",
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF5D4037),
+                        ),
+                      ),
+                      Text(
+                        "₹${car.driverAllowance.toInt()}/day",
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFFE65100),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        "Toll extra",
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildSafeTravelInfo() {
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: darkBg,
-        borderRadius: BorderRadius.circular(15),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.security, color: Colors.amber, size: 20),
-              const SizedBox(width: 10),
-              Text("Why Rentox Car Rental?",
-                  style: GoogleFonts.poppins(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
+              Icon(Icons.verified_user_rounded, color: primaryAmber, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                "Why Rentox Car Rental?",
+                style: GoogleFonts.montserrat(
+                  color: darkCanvas,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
           _bulletPoint("No hidden charges, Toll & Parking extra at actuals."),
           _bulletPoint("Verified & experienced highway drivers."),
-          _bulletPoint("Well maintained & cleaned fleet."),
+          _bulletPoint("Well maintained & sanitized fleet with 24/7 support."),
         ],
       ),
     );
@@ -407,15 +732,18 @@ class _RoundtripcarselectionState extends State<Roundtripcarselection> {
 
   Widget _bulletPoint(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 5),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.check_circle_outline, color: Colors.amber, size: 14),
+          Icon(Icons.check_circle_outline, color: primaryAmber, size: 14),
           const SizedBox(width: 8),
           Expanded(
-              child: Text(text,
-                  style: const TextStyle(color: Colors.white70, fontSize: 11))),
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(color: Colors.grey.shade700, fontSize: 11.5),
+            ),
+          ),
         ],
       ),
     );

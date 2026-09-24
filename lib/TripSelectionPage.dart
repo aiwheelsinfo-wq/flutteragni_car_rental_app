@@ -664,7 +664,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                 ),
                 _buildServiceCard(
                   icon: Icons.timer_rounded,
-                  title: 'Local Duty',
+                  title: 'Hourly Rental',
                   subtitle: '8hr / 80km',
                   gradientColors: const [Color(0xFFFF8008), Color(0xFFFFC837)],
                   isAvailable: true,

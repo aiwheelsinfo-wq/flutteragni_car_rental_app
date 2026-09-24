@@ -578,7 +578,7 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                           ),
                         ),
                         child: Text(
-                          type,
+                          type == 'Local-Duty' ? 'Hourly Rental' : type,
                           style: GoogleFonts.poppins(
                             fontSize: 12,
                             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -1019,7 +1019,7 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                           style: GoogleFonts.poppins(
                               fontSize: 14, fontWeight: FontWeight.w500)),
                       const SizedBox(height: 35),
-                      Text(booking['to_address'] ?? 'Local Duty',
+                      Text(booking['to_address'] ?? 'Hourly Rental',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.poppins(
@@ -1099,7 +1099,10 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                           color: Colors.amber[50],
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(color: Colors.amber.shade200, width: 0.5)),
-                      child: Text(booking['trip_type'] ?? '',
+                      child: Text(
+                          (booking['trip_type'] ?? '') == 'Local-Duty'
+                              ? 'Hourly Rental'
+                              : (booking['trip_type'] ?? ''),
                           style: GoogleFonts.poppins(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
