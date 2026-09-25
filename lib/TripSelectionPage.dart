@@ -282,6 +282,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
   DateTime? lastNotificationFetch;
   bool _isInsideBoundary = false;
   bool _isCheckingLocation = true;
+  Map<String, dynamic> _serviceStatus = {};
 
   final List<String> imageUrls = [
     'https://agnicarrental.com/driver2025/add/add1.webp',
@@ -298,16 +299,186 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     fetchSpinnerContent();
     checkForUpdate();
     _checkCurrentLocationBoundary();
+    _fetchServiceStatus();
 
     lifecycle = LifecycleService(onResume: () {
       checkNotification();
       _checkCurrentLocationBoundary();
+      _fetchServiceStatus();
     });
     lifecycle.init();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       checkNotification();
     });
+  }
+
+  Future<void> _fetchServiceStatus() async {
+    try {
+      final response = await http
+          .get(Uri.parse('https://agnicarrental.com/2025/get_service_status.php'))
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if ((data['success'] == true || data['status'] == 'success') && data['services'] != null) {
+          if (mounted) {
+            setState(() {
+              _serviceStatus = Map<String, dynamic>.from(data['services']);
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching service status: $e");
+    }
+  }
+
+  bool _isServiceEnabled(String serviceKey) {
+    if (_serviceStatus.containsKey(serviceKey)) {
+      final item = _serviceStatus[serviceKey];
+      if (item is Map && item.containsKey('is_enabled')) {
+        final val = item['is_enabled'];
+        return val == true || val == 1 || val == '1';
+      }
+    }
+    return true; // Default to enabled if not loaded or not in table
+  }
+
+  Map<String, dynamic>? _getServiceInfo(String serviceKey) {
+    if (_serviceStatus.containsKey(serviceKey) && _serviceStatus[serviceKey] is Map) {
+      return Map<String, dynamic>.from(_serviceStatus[serviceKey]);
+    }
+    return null;
+  }
+
+  void _showComingSoonDialog(String serviceKey, String fallbackTitle) {
+    final info = _getServiceInfo(serviceKey);
+    final title = (info != null && info['title'] != null && info['title'].toString().isNotEmpty)
+        ? info['title'].toString()
+        : "$fallbackTitle Launching Soon";
+    final message = (info != null && info['message'] != null && info['message'].toString().isNotEmpty)
+        ? info['message'].toString()
+        : "We are fine-tuning this service to deliver the best ride experience. Stay tuned!";
+    final badge = (info != null && info['badge_text'] != null && info['badge_text'].toString().isNotEmpty)
+        ? info['badge_text'].toString()
+        : "Coming Soon";
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.12),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF5722).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.access_time_filled_rounded,
+                    color: Colors.white,
+                    size: 34,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFFFB74D), width: 1),
+                  ),
+                  child: Text(
+                    badge.toUpperCase(),
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFFE65100),
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: const Color(0xFF64748B),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1E3A8A),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      'GOT IT',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _checkCurrentLocationBoundary() async {
@@ -529,9 +700,18 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
     final size = MediaQuery.of(context).size;
     return Scaffold(
       backgroundColor: bgCream,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await Future.wait([
+            fetchUserPoints(),
+            _checkCurrentLocationBoundary(),
+            _fetchServiceStatus(),
+          ]);
+        },
+        color: primaryAmber,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          slivers: [
           // ─── Hero Header ───
           SliverToBoxAdapter(
             child: Container(
@@ -645,30 +825,46 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                   title: 'One Way',
                   subtitle: 'Outstation',
                   gradientColors: [const Color(0xFF4776E6), const Color(0xFF8E54E9)],
-                  isAvailable: true,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => FromToMapScreen()),
-                  ),
+                  isAvailable: _isServiceEnabled('one_way'),
+                  onTap: () {
+                    if (!_isServiceEnabled('one_way')) {
+                      _showComingSoonDialog('one_way', 'One Way');
+                      return;
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => FromToMapScreen()),
+                    );
+                  },
                 ),
                 _buildServiceCard(
                   icon: Icons.sync_alt_rounded,
                   title: 'Round Trip',
                   subtitle: 'Outstation',
                   gradientColors: [const Color(0xFF11998E), const Color(0xFF38EF7D)],
-                  isAvailable: true,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => RoundTripFromToMapScreen()),
-                  ),
+                  isAvailable: _isServiceEnabled('round_trip'),
+                  onTap: () {
+                    if (!_isServiceEnabled('round_trip')) {
+                      _showComingSoonDialog('round_trip', 'Round Trip');
+                      return;
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => RoundTripFromToMapScreen()),
+                    );
+                  },
                 ),
                 _buildServiceCard(
                   icon: Icons.timer_rounded,
                   title: 'Hourly Rental',
                   subtitle: '8hr / 80km',
                   gradientColors: const [Color(0xFFFF8008), Color(0xFFFFC837)],
-                  isAvailable: true,
+                  isAvailable: _isServiceEnabled('local_duty'),
                   onTap: () {
+                    if (!_isServiceEnabled('local_duty')) {
+                      _showComingSoonDialog('local_duty', 'Hourly Rental');
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -682,8 +878,12 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                   title: 'Local Cab',
                   subtitle: 'Quick Ride',
                   gradientColors: const [Color(0xFF7B2FF7), Color(0xFFF107A3)],
-                  isAvailable: true,
+                  isAvailable: _isServiceEnabled('local_taxi'),
                   onTap: () {
+                    if (!_isServiceEnabled('local_taxi')) {
+                      _showComingSoonDialog('local_taxi', 'Local Cab');
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => LocalTaxi()),
@@ -881,6 +1081,7 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
           const SliverToBoxAdapter(child: SizedBox(height: 48)),
         ],
       ),
+      ),
     );
   }
 
@@ -997,30 +1198,62 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Icon container with gradient
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isAvailable
-                        ? gradientColors
-                        : [Colors.grey.shade300, Colors.grey.shade400],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              // Icon container with gradient + optional Soon badge
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isAvailable
+                            ? gradientColors
+                            : [Colors.grey.shade300, Colors.grey.shade400],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: isAvailable
+                          ? [
+                              BoxShadow(
+                                color: gradientColors[0].withOpacity(0.35),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              )
+                            ]
+                          : [],
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 26),
                   ),
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: isAvailable
-                      ? [
+                  if (!isAvailable)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
                           BoxShadow(
-                            color: gradientColors[0].withOpacity(0.35),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          )
-                        ]
-                      : [],
-                ),
-                child: Icon(icon, color: Colors.white, size: 26),
+                            color: const Color(0xFFFF5722).withOpacity(0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Text(
+                        'SOON',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const Spacer(),
               // Title
