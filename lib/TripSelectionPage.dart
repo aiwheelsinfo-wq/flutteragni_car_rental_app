@@ -1018,12 +1018,16 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  '24/7 Customer Support',
-                                  style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    color: Colors.white,
+                                Flexible(
+                                  child: Text(
+                                    '24/7 Support',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 6),
@@ -1045,8 +1049,11 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 2),
                             Text(
-                              'Instant live help with bookings, cab tracking & fares',
+                              'Instant help with bookings & rides',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
                                 color: Colors.grey[300],
@@ -1055,9 +1062,10 @@ class _TripSelectionPageState extends State<TripSelectionPage> {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 10),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
+                            horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFF8F00),
                           borderRadius: BorderRadius.circular(12),
