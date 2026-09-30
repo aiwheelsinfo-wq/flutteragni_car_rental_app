@@ -77,6 +77,25 @@ class Car {
   }
 }
 
+// --- INTERMEDIATE STOP MODEL ---
+class IntermediateStop {
+  final TextEditingController controller;
+  String? placeId;
+  String? lat;
+  String? lng;
+  List<AutocompletePrediction> predictions;
+  bool isOutside;
+
+  IntermediateStop({
+    required this.controller,
+    this.placeId,
+    this.lat,
+    this.lng,
+    List<AutocompletePrediction>? predictions,
+    this.isOutside = false,
+  }) : predictions = predictions ?? [];
+}
+
 class LocalDutyBookingForm extends StatefulWidget {
   final String fromLocation;
   const LocalDutyBookingForm({required this.fromLocation});
@@ -128,6 +147,146 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
   String? fromLng;
   String? toLat;
   String? toLng;
+
+  // Multi-Stop Management
+  List<IntermediateStop> intermediateStops = [];
+  static const int maxStops = 4;
+
+  void _addIntermediateStop() {
+    if (intermediateStops.length < maxStops) {
+      setState(() {
+        intermediateStops.add(IntermediateStop(controller: TextEditingController()));
+      });
+    }
+  }
+
+  void _removeIntermediateStop(int index) {
+    if (index >= 0 && index < intermediateStops.length) {
+      setState(() {
+        intermediateStops[index].controller.dispose();
+        intermediateStops.removeAt(index);
+      });
+    }
+  }
+
+  void _getStopLocationSuggestions(int index, String input) async {
+    if (index >= intermediateStops.length) return;
+    intermediateStops[index].placeId = null;
+    if (apiKey.isEmpty || input.trim().isEmpty) {
+      setState(() => intermediateStops[index].predictions = []);
+      return;
+    }
+    _googlePlace = GooglePlace(apiKey);
+    final result = await _googlePlace.autocomplete.get(input);
+    if (result != null && result.predictions != null) {
+      setState(() => intermediateStops[index].predictions = result.predictions!);
+    }
+  }
+
+  void _onStopSelected(int index, AutocompletePrediction prediction) async {
+    if (index >= intermediateStops.length) return;
+    final desc = prediction.description ?? '';
+    final placeId = prediction.placeId;
+    intermediateStops[index].controller.text = desc;
+    intermediateStops[index].placeId = placeId;
+    FocusScope.of(context).unfocus();
+    setState(() => intermediateStops[index].predictions = []);
+
+    if (placeId != null && apiKey.isNotEmpty) {
+      try {
+        _googlePlace = GooglePlace(apiKey);
+        final details = await _googlePlace.details.get(placeId);
+        final loc = details?.result?.geometry?.location;
+        if (loc != null && loc.lat != null && loc.lng != null) {
+          setState(() {
+            intermediateStops[index].lat = loc.lat.toString();
+            intermediateStops[index].lng = loc.lng.toString();
+          });
+
+          // Check if stop location is inside the same boundary as pickup
+          if (fromLat != null && fromLng != null) {
+            final boundaryService = BoundaryService();
+            final pCity = boundaryService.detectCity(
+              LatLng(double.tryParse(fromLat!) ?? 0, double.tryParse(fromLng!) ?? 0),
+              locationController.text,
+            );
+            if (pCity != null) {
+              final isStopInside = boundaryService.isPointInCity(
+                LatLng(loc.lat!, loc.lng!),
+                desc,
+                pCity,
+              );
+              setState(() {
+                intermediateStops[index].isOutside = !isStopInside;
+              });
+              if (!isStopInside) {
+                _showOutsideStopBoundaryDialog(index + 1, desc, (pCity['name'] ?? pCity['city_name'] ?? 'City').toString());
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint("Stop place details error: $e");
+      }
+    }
+  }
+
+  void _showOutsideStopBoundaryDialog(int stopNum, String stopAddress, String cityName) {
+    final stopName = stopAddress.split(',').first.trim().isNotEmpty
+        ? stopAddress.split(',').first.trim()
+        : "Stop $stopNum";
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.location_off_rounded, color: Colors.red, size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Stop Outside Boundary",
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Stop $stopNum ("$stopName") is outside the $cityName Hourly Rental boundary.\n\nAll stops in a Local Duty trip must be within the $cityName service boundary. For destinations outside the boundary, please choose Outstation or Round-Trip.',
+            style: GoogleFonts.poppins(fontSize: 13, height: 1.45, color: darkText),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryAmber,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(
+                "Change Stop Location",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   // Theme Colors
   final Color primaryAmber = const Color(0xFFFFB300);
@@ -375,6 +534,76 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
         }
       }
 
+      // Validate all Intermediate Stops
+      for (int i = 0; i < intermediateStops.length; i++) {
+        final stop = intermediateStops[i];
+        final stopText = stop.controller.text.trim();
+        if (stopText.isEmpty) continue;
+
+        // Geocode if missing lat/lng
+        if (stop.lat == null || stop.lng == null) {
+          if (stop.placeId != null && apiKey.isNotEmpty) {
+            try {
+              _googlePlace = GooglePlace(apiKey);
+              final sDetails = await _googlePlace.details.get(stop.placeId!);
+              stop.lat = sDetails?.result?.geometry?.location?.lat?.toString();
+              stop.lng = sDetails?.result?.geometry?.location?.lng?.toString();
+            } catch (_) {}
+          } else {
+            try {
+              final stopGeocodeUrl = Uri.parse(
+                  'https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(stopText)}&key=$apiKey');
+              final sResp = await http.get(stopGeocodeUrl);
+              if (sResp.statusCode == 200) {
+                final sJson = json.decode(sResp.body);
+                if (sJson['status'] == 'OK') {
+                  stop.lat = sJson['results'][0]['geometry']['location']['lat']?.toString();
+                  stop.lng = sJson['results'][0]['geometry']['location']['lng']?.toString();
+                }
+              }
+            } catch (_) {}
+          }
+        }
+
+        // Check boundary for this stop
+        if (stop.lat != null && stop.lng != null) {
+          final double sLat = double.tryParse(stop.lat!) ?? 0.0;
+          final double sLng = double.tryParse(stop.lng!) ?? 0.0;
+          final bool isStopInside = boundaryService.isPointInCity(
+            LatLng(sLat, sLng),
+            stopText,
+            detectedCity,
+          );
+
+          if (!isStopInside) {
+            setState(() {
+              stop.isOutside = true;
+              isSubmitting = false;
+            });
+            _showOutsideStopBoundaryDialog(i + 1, stopText, (detectedCity['name'] ?? detectedCity['city_name'] ?? 'City').toString());
+            return;
+          }
+        }
+      }
+
+      // Format complete route for to_address (combining intermediate stops + final drop)
+      List<String> routeSegments = [];
+      for (int i = 0; i < intermediateStops.length; i++) {
+        final stopText = intermediateStops[i].controller.text.trim();
+        if (stopText.isNotEmpty) {
+          routeSegments.add("Stop ${i + 1}: $stopText");
+        }
+      }
+      final dropText = dropLocationController.text.trim();
+      if (dropText.isNotEmpty) {
+        if (routeSegments.isNotEmpty) {
+          routeSegments.add("Drop: $dropText");
+        } else {
+          routeSegments.add(dropText);
+        }
+      }
+      final String formattedToAddress = routeSegments.join(" | ");
+
       String formattedTime = "";
       if (selectedTime != null) {
         formattedTime =
@@ -394,7 +623,7 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
         'from_address': locationController.text,
         'fromLat': lat,
         'fromLng': lng,
-        'to_address': dropLocationController.text.trim(),
+        'to_address': formattedToAddress,
         'toLat': toLat ?? '',
         'toLng': toLng ?? '',
         'date': selectedDate?.toIso8601String() ?? '',
@@ -717,13 +946,110 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
               ),
             ),
 
+          // 🔵 Intermediate Stops
+          for (int i = 0; i < intermediateStops.length; i++) ...[
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            TextField(
+              controller: intermediateStops[i].controller,
+              onChanged: (val) => _getStopLocationSuggestions(i, val),
+              decoration: _inputDecoration("Stop ${i + 1} (e.g. Hospital, Bank)", Icons.stop_circle_outlined).copyWith(
+                prefixIcon: const Icon(Icons.trip_origin_rounded, color: Colors.blueAccent, size: 20),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 18, color: Colors.grey),
+                  onPressed: () => _removeIntermediateStop(i),
+                ),
+              ),
+            ),
+            if (intermediateStops[i].isOutside &&
+                fromLat != null &&
+                fromLng != null &&
+                BoundaryService().detectCity(
+                    LatLng(double.tryParse(fromLat!) ?? 0, double.tryParse(fromLng!) ?? 0),
+                    locationController.text) != null)
+              Container(
+                margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Stop ${i + 1} is outside the ${(BoundaryService().detectCity(LatLng(double.tryParse(fromLat!) ?? 0, double.tryParse(fromLng!) ?? 0), locationController.text)?['name'] ?? 'city')} boundary',
+                        style: GoogleFonts.poppins(
+                          color: Colors.red.shade800,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (intermediateStops[i].predictions.isNotEmpty)
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: intermediateStops[i].predictions.length,
+                itemBuilder: (context, pIndex) => ListTile(
+                  leading: const Icon(Icons.place, color: Colors.blueAccent),
+                  title: Text(intermediateStops[i].predictions[pIndex].description ?? '',
+                      style: const TextStyle(fontSize: 13)),
+                  onTap: () => _onStopSelected(i, intermediateStops[i].predictions[pIndex]),
+                ),
+              ),
+          ],
+
+          // ➕ Add Stop Button
+          if (intermediateStops.length < maxStops) ...[
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            InkWell(
+              onTap: _addIntermediateStop,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: lightAmber,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.add, color: primaryAmber, size: 16),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      intermediateStops.isEmpty
+                          ? "+ Add Stop (Multiple Places)"
+                          : "+ Add Another Stop (${intermediateStops.length}/$maxStops)",
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
           const Divider(height: 1, indent: 16, endIndent: 16),
 
-          // 🔴 2. Drop Address (Optional)
+          // 🔴 2. Drop Address (Optional or Final Drop)
           TextField(
             controller: dropLocationController,
             onChanged: _getDropLocationSuggestions,
-            decoration: _inputDecoration("Drop Destination (Optional)", Icons.location_on).copyWith(
+            decoration: _inputDecoration(
+              intermediateStops.isNotEmpty ? "Final Drop Destination (Optional)" : "Drop Destination (Optional)",
+              Icons.location_on,
+            ).copyWith(
               prefixIcon: const Icon(Icons.location_on, color: Colors.redAccent),
               suffixIcon: dropLocationController.text.isNotEmpty
                   ? IconButton(
