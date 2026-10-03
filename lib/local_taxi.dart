@@ -241,12 +241,21 @@ class _LocalTaxiState extends State<LocalTaxi> {
   Future<void> _getCurrentLocation() async {
     setState(() => isGettingLocation = true);
     try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) setState(() => isGettingLocation = false);
+        return;
+      }
       Position position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
       List<Placemark> placemarks =
           await placemarkFromCoordinates(position.latitude, position.longitude);
 
-      if (placemarks.isNotEmpty) {
+      if (placemarks.isNotEmpty && mounted) {
         Placemark place = placemarks.first;
         String currentAddress =
             "${place.name}, ${place.locality}, ${place.administrativeArea}";
@@ -259,7 +268,8 @@ class _LocalTaxiState extends State<LocalTaxi> {
         _updateMarkers();
       }
     } catch (e) {
-      setState(() => isGettingLocation = false);
+      debugPrint("Error in _getCurrentLocation: $e");
+      if (mounted) setState(() => isGettingLocation = false);
     }
   }
 
