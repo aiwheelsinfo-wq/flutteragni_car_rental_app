@@ -149,15 +149,24 @@ class _FromToMapScreenState extends State<FromToMapScreen> {
   }
 
   Future<void> getCurrentLocation() async {
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied)
-      permission = await Geolocator.requestPermission();
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
-    currentLatLng = LatLng(position.latitude, position.longitude);
-    mapController
-        ?.animateCamera(CameraUpdate.newLatLngZoom(currentLatLng!, 15));
-    await _getAddressFromLatLng(position.latitude, position.longitude);
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      currentLatLng = LatLng(position.latitude, position.longitude);
+      mapController
+          ?.animateCamera(CameraUpdate.newLatLngZoom(currentLatLng!, 15));
+      await _getAddressFromLatLng(position.latitude, position.longitude);
+    } catch (e) {
+      debugPrint("Error in getCurrentLocation: $e");
+    }
   }
 
   Future<void> _getAddressFromLatLng(double lat, double lng) async {
