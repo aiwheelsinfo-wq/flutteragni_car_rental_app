@@ -143,15 +143,19 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
     if (minLat < maxLat && minLng < maxLng) {
       setState(() => _selectedCityName = null);
       _rebuildMapElements();
-      _mapController!.animateCamera(
-        CameraUpdate.newLatLngBounds(
-          LatLngBounds(
-            southwest: LatLng(minLat, minLng),
-            northeast: LatLng(maxLat, maxLng),
+      try {
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLngBounds(
+            LatLngBounds(
+              southwest: LatLng(minLat, minLng),
+              northeast: LatLng(maxLat, maxLng),
+            ),
+            70.0,
           ),
-          70.0,
-        ),
-      );
+        );
+      } catch (e) {
+        debugPrint("Error fitting boundaries: $e");
+      }
     }
   }
 
@@ -176,15 +180,19 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
     // Show info window for selected city marker
     _mapController?.showMarkerInfoWindow(MarkerId(cityName));
 
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLngBounds(
-        LatLngBounds(
-          southwest: LatLng(minLat, minLng),
-          northeast: LatLng(maxLat, maxLng),
+    try {
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngBounds(
+          LatLngBounds(
+            southwest: LatLng(minLat, minLng),
+            northeast: LatLng(maxLat, maxLng),
+          ),
+          60.0,
         ),
-        60.0,
-      ),
-    );
+      );
+    } catch (e) {
+      debugPrint("Error zooming to city: $e");
+    }
   }
 
   @override
@@ -228,7 +236,9 @@ class _AvailableBoundariesMapPageState extends State<AvailableBoundariesMapPage>
             onMapCreated: (controller) {
               _mapController = controller;
               if (_cities.isNotEmpty) {
-                _fitAllBoundaries();
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  if (mounted) _fitAllBoundaries();
+                });
               }
             },
           ),
