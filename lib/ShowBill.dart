@@ -223,9 +223,9 @@ class _ShowBillPageState extends State<ShowBillPage> {
                 style: GoogleFonts.poppins(
                     fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            Text("No advance payment required! Pay ₹${widget.totalAmount.toStringAsFixed(0)} directly to your driver via Cash or UPI when your trip completes.",
+            Text("No advance payment required! Pay estimated ₹${widget.totalAmount.toStringAsFixed(0)} directly to your driver via Cash or UPI upon trip completion.\n(Final fare may adjust based on actual route & trip metrics)",
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[700])),
+                style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[700])),
             const SizedBox(height: 20),
             Row(
               children: [
@@ -478,19 +478,61 @@ class _ShowBillPageState extends State<ShowBillPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: Text("Payable to Driver at Trip End",
+                            child: Text("Approx. Payable at Trip End",
                                 style: GoogleFonts.poppins(
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.grey[600])),
+                                    color: Colors.grey[700])),
                           ),
                           const SizedBox(width: 8),
-                          Text("₹${widget.totalAmount.toStringAsFixed(2)}",
+                          Text("₹${widget.totalAmount.toStringAsFixed(0)}",
                               style: GoogleFonts.poppins(
-                                  fontSize: 12,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.grey[700])),
+                                  color: const Color(0xFF212121))),
                         ],
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.green.shade200, width: 0.8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.check_circle_rounded, size: 15, color: Colors.green[800]),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    "Pay on Trip End: No advance required. Pay estimated ₹${widget.totalAmount.toStringAsFixed(0)} directly to your driver via Cash or UPI upon trip completion.",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11,
+                                      color: Colors.green[900],
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              "* Note: The final payable amount may vary at the end of the trip based on actual KM traveled, extra hours, tolls/parking, or driver allowances.",
+                              style: GoogleFonts.poppins(
+                                fontSize: 10,
+                                color: Colors.green[900],
+                                fontStyle: FontStyle.italic,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
