@@ -159,7 +159,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
     int days = _calculateDays();
     double baseAdvance = dailyLimit * 4.0 * days; // ₹4 per KM advance
     double baseFare = dailyLimit * widget.kmRate * days; // e.g. ₹13/KM
-    double dailyAllowanceRate = 400.0;
+    double dailyAllowanceRate = widget.driverAllowance > 0 ? widget.driverAllowance : 400.0;
     double driverAllowance = (dailyAllowanceRate * days) + (_isEarlyMorningTime(widget.departureTime) ? 300.0 : 0.0);
     double rentoxEarning = dailyLimit * 2.0 * days; // ₹2 per KM
     double vendorEarning = (dailyLimit * 11.0 * days) + driverAllowance; // ₹11 per KM + allowance
@@ -576,7 +576,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
     double dailyLimit = widget.kmPerDay;
     int days = _calculateDays();
     double baseFare = dailyLimit * widget.kmRate * days;
-    double dailyAllowanceRate = 400.0;
+    double dailyAllowanceRate = widget.driverAllowance > 0 ? widget.driverAllowance : 400.0;
     double driverAllowance = dailyAllowanceRate * days;
     bool isEarlyMorning = _isEarlyMorningTime(widget.departureTime);
     double calculatedCommission = _calculateAgentCommission();
