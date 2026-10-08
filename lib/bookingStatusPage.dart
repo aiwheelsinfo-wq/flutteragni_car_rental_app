@@ -14,6 +14,7 @@ import 'DriverToPickupMap.dart';
 import 'package:share_plus/share_plus.dart';
 import 'cancellationSuccessPage.dart';
 import 'tripDetailsPage.dart';
+import 'trip_feedback_dialog.dart';
 
 class BookingStatusPage extends StatefulWidget {
   @override
@@ -25,6 +26,7 @@ class _BookingStatusPageState extends State<BookingStatusPage>
   List<dynamic> upcomingBookings = [];
   List<dynamic> pastBookings = [];
   Map<int, int> bookingDiscounts = {};
+  final Set<String> _reviewedBookingIds = {};
 
   bool isLoading = true;
   bool hasError = false;
@@ -117,6 +119,10 @@ class _BookingStatusPageState extends State<BookingStatusPage>
 
     for (var b in data) {
       if (b['booking_status'] == 'Deleted') continue;
+      if (b['has_reviewed'] == true) {
+        if (b['id'] != null) _reviewedBookingIds.add(b['id'].toString());
+        if (b['booking_id'] != null) _reviewedBookingIds.add(b['booking_id'].toString());
+      }
       
       // Parse date safely as local date to prevent timezone shifts (e.g. UTC-offset device showing today's trips in Past tab)
       DateTime bDate;
@@ -1534,17 +1540,22 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                           "View Details",
                           Icons.receipt_long_rounded,
                           const Color(0xFF1C1F26),
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => TripDetailsPage(
-                                booking: Map<String, dynamic>.from(booking),
-                                driver: driver,
-                                isPast: isPast,
-                                onCancelBooking: (ctx, b) => _showCancellationBottomSheet(ctx, b),
+                          () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => TripDetailsPage(
+                                  booking: Map<String, dynamic>.from(booking),
+                                  driver: driver,
+                                  isPast: isPast,
+                                  onCancelBooking: (ctx, b) => _showCancellationBottomSheet(ctx, b),
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                            if (phoneNumber != null) {
+                              fetchBookings(phoneNumber!);
+                            }
+                          },
                         ),
                       ),
                       if (booking['payment_type'] == 'Advance') ...[
@@ -1575,7 +1586,37 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                                                   booking['id'].toString())))),
                         ),
                       ],
-                      if (isPast && status == 'Completed') ...[
+                      if (isPast && status.toLowerCase().contains('complet')) ...[
+                        if (!(booking['has_reviewed'] == true ||
+                            _reviewedBookingIds.contains(booking['id']?.toString() ?? '') ||
+                            _reviewedBookingIds.contains(booking['booking_id']?.toString() ?? ''))) ...[
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _actionButton(
+                              "Rate Trip",
+                              Icons.star_rounded,
+                              const Color(0xFFFFB300),
+                              () async {
+                                final bId = booking['id'].toString();
+                                final bCode = (booking['booking_id'] ?? '').toString();
+                                final updated = await TripFeedbackDialog.show(
+                                  context,
+                                  bookingId: bId,
+                                  driverName: driver?['full_name'],
+                                  carType: booking['car_type'],
+                                  customerPhone: booking['customer_number'] ?? booking['mobile'],
+                                );
+                                if (updated == true) {
+                                  setState(() {
+                                    _reviewedBookingIds.add(bId);
+                                    if (bCode.isNotEmpty) _reviewedBookingIds.add(bCode);
+                                    booking['has_reviewed'] = true;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ],
                         const SizedBox(width: 8),
                         Expanded(
                           child: _actionButton(

@@ -1,16 +1,17 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'DriverToPickupMap.dart';
 import 'car_invoice.dart';
+import 'trip_feedback_dialog.dart';
+import 'report_driver_dialog.dart';
+import 'package:agni_car_rental/config/api_config.dart';
 
-class TripDetailsPage extends StatelessWidget {
+class TripDetailsPage extends StatefulWidget {
   final Map<String, dynamic> booking;
   final Map<String, dynamic>? driver;
   final bool isPast;
@@ -24,9 +25,81 @@ class TripDetailsPage extends StatelessWidget {
     this.onCancelBooking,
   }) : super(key: key);
 
+  @override
+  State<TripDetailsPage> createState() => _TripDetailsPageState();
+}
+
+class _TripDetailsPageState extends State<TripDetailsPage> {
   final Color amberPrimary = const Color(0xFFFFC107);
   final Color amberDark = const Color(0xFFFF8F00);
   final Color darkCharcoal = const Color(0xFF1C1F26);
+
+  Map<String, dynamic> get booking => widget.booking;
+  Map<String, dynamic>? get driver => widget.driver;
+  bool get isPast => widget.isPast;
+  Function(BuildContext, Map<String, dynamic>)? get onCancelBooking => widget.onCancelBooking;
+
+  Map<String, dynamic>? _existingReview;
+  bool _hasReviewed = false;
+
+  Map<String, dynamic>? _existingIncident;
+  bool _hasReportedIncident = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAndFetchReview();
+  }
+
+  Future<void> _checkAndFetchReview() async {
+    final bId = widget.booking['id']?.toString() ?? widget.booking['booking_id']?.toString() ?? '';
+    final status = widget.booking['booking_status'] ?? '';
+
+    // Fetch review if completed
+    if (status.toString().toLowerCase().contains('complet') && bId.isNotEmpty) {
+      try {
+        final url = Uri.parse("${ApiConfig.baseUrl}/get_trip_review.php?booking_id=$bId");
+        final res = await http.get(url);
+        final data = jsonDecode(res.body);
+        if (data['success'] == true && data['has_reviewed'] == true) {
+          if (mounted) {
+            setState(() {
+              _hasReviewed = true;
+              _existingReview = data['review'];
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _hasReviewed = false;
+              _existingReview = null;
+            });
+          }
+        }
+      } catch (e) {
+        // Ignore network errors gracefully
+      }
+    }
+
+    // Always check for incident reports for this booking
+    if (bId.isNotEmpty) {
+      try {
+        final incUrl = Uri.parse("${ApiConfig.baseUrl}/get_trip_incidents.php?booking_id=$bId");
+        final incRes = await http.get(incUrl);
+        final incData = jsonDecode(incRes.body);
+        if (incData['success'] == true && incData['has_reported'] == true) {
+          if (mounted) {
+            setState(() {
+              _hasReportedIncident = true;
+              _existingIncident = incData['latest_report'];
+            });
+          }
+        }
+      } catch (e) {
+        // Ignore network errors gracefully
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +151,21 @@ class TripDetailsPage extends StatelessWidget {
             // 1. Status & Header Banner
             _buildStatusHeader(status, bookingDate, bookingTime),
             const SizedBox(height: 16),
+
+            // Safety Incident Report Card (if customer reported this trip)
+            if (_hasReportedIncident && _existingIncident != null) ...[
+              _buildIncidentReportCard(context),
+              const SizedBox(height: 16),
+            ],
+
+            // Trip Feedback & Rating Section
+            if (status.toString().toLowerCase().contains('complet') && _hasReviewed && _existingReview != null) ...[
+              _buildTripReviewCard(context),
+              const SizedBox(height: 16),
+            ] else if (status.toString().toLowerCase().contains('complet') && !_hasReviewed) ...[
+              _buildTripRatePromptCard(context),
+              const SizedBox(height: 16),
+            ],
 
             // 2. Driver OTP Card (Start OTP before trip / Completion OTP during In-Transit)
             if (!isPast && !_isCancelled(status)) ...[
@@ -1254,6 +1342,37 @@ class TripDetailsPage extends StatelessWidget {
                 ),
               ),
             ] else if (isCompleted) ...[
+              if (!_hasReviewed) ...[
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final updated = await TripFeedbackDialog.show(
+                        context,
+                        bookingId: booking['id'].toString(),
+                        driverName: driver?['full_name'],
+                        carType: booking['car_type'],
+                        customerPhone: booking['customer_number'] ?? booking['mobile'],
+                      );
+                      if (updated == true) {
+                        _checkAndFetchReview();
+                      }
+                    },
+                    icon: const Icon(Icons.star_rounded, size: 18),
+                    label: Text(
+                      "Rate Trip",
+                      style: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w700),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFB300),
+                      foregroundColor: const Color(0xFF1A1A1A),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
@@ -1299,6 +1418,50 @@ class TripDetailsPage extends StatelessWidget {
             ],
           ],
         ),
+        // 3. Report Driver / Safety Concern Button
+        if (driver != null || isPast || isCompleted) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: TextButton.icon(
+              onPressed: () async {
+                final reported = await ReportDriverDialog.show(
+                  context,
+                  bookingId: booking['id']?.toString() ?? booking['booking_id']?.toString() ?? '',
+                  driverName: driver?['full_name'],
+                  driverId: driver?['phone_number'] ?? driver?['driver_id'] ?? booking['driver_id']?.toString(),
+                  customerPhone: booking['customer_number'] ?? booking['mobile'],
+                );
+                if (reported == true) {
+                  _checkAndFetchReview();
+                }
+              },
+              icon: Icon(
+                _hasReportedIncident ? Icons.shield_rounded : Icons.shield_outlined,
+                color: const Color(0xFFDC2626),
+                size: 18,
+              ),
+              label: Text(
+                _hasReportedIncident
+                    ? "Safety Incident Reported (${_existingIncident?['ticket_no'] ?? 'Filed'})"
+                    : "Report Driver / Safety Concern",
+                style: GoogleFonts.poppins(
+                  color: const Color(0xFFDC2626),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFFFEF2F2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFFECACA), width: 1.2),
+                ),
+              ),
+            ),
+          ),
+        ],
         if (canCancel && onCancelBooking != null) ...[
           const SizedBox(height: 12),
           SizedBox(
@@ -1367,5 +1530,436 @@ class TripDetailsPage extends StatelessWidget {
       debugPrint("Reverse geocoding error: $e");
     }
     return "Location not available";
+  }
+
+  Widget _buildIncidentReportCard(BuildContext context) {
+    if (_existingIncident == null) return const SizedBox.shrink();
+
+    final ticketNo = _existingIncident!['ticket_no'] ?? 'INCIDENT';
+    final incidentType = _existingIncident!['incident_type'] ?? 'Safety Complaint';
+    final status = _existingIncident!['status'] ?? 'Pending';
+    final description = _existingIncident!['description'] ?? '';
+    final adminAction = _existingIncident!['admin_action'];
+
+    Color statusColor = const Color(0xFFD97706);
+    if (status == 'Resolved') {
+      statusColor = const Color(0xFF059669);
+    } else if (status == 'Investigating') {
+      statusColor = const Color(0xFF4F46E5);
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF5F5),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFFECACA), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626).withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.shield_rounded, color: Color(0xFFDC2626), size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Safety Incident Reported",
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: const Color(0xFF991B1B),
+                      ),
+                    ),
+                    Text(
+                      "Ticket #$ticketNo",
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: statusColor.withOpacity(0.4)),
+                ),
+                child: Text(
+                  status,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            "$incidentType: \"$description\"",
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: Colors.grey.shade800,
+              fontStyle: FontStyle.italic,
+              height: 1.35,
+            ),
+          ),
+          if (adminAction != null && adminAction.toString().trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline, size: 14, color: Colors.green),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      "Resolution: $adminAction",
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTripReviewCard(BuildContext context) {
+    if (_existingReview == null) return const SizedBox.shrink();
+
+    final int rating = int.tryParse((_existingReview!['rating'] ?? 5).toString()) ?? 5;
+    final String tags = (_existingReview!['tags'] ?? '').toString().trim();
+    final String reviewText = (_existingReview!['review_text'] ?? '').toString().trim();
+    final List<String> tagList = tags.isNotEmpty
+        ? tags.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList()
+        : [];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBF0),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFFE082), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFB300).withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.star_rounded, color: Color(0xFFD97706), size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Your Trip Rating",
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: const Color(0xFF1A1A1A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      "Feedback submitted",
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () async {
+                  final updated = await TripFeedbackDialog.show(
+                    context,
+                    bookingId: booking['id'].toString(),
+                    driverName: driver?['full_name'],
+                    carType: booking['car_type'],
+                    customerPhone: booking['customer_number'] ?? booking['mobile'],
+                    initialRating: rating,
+                    initialTags: tags,
+                    initialComment: reviewText,
+                  );
+                  if (updated == true) {
+                    _checkAndFetchReview();
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFFB300)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.edit_rounded, size: 14, color: Color(0xFFD97706)),
+                      const SizedBox(width: 4),
+                      Text(
+                        "Edit",
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFD97706),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Star Display & Score
+          Row(
+            children: [
+              Row(
+                children: List.generate(5, (index) {
+                  final isFilled = (index + 1) <= rating;
+                  return Icon(
+                    isFilled ? Icons.star_rounded : Icons.star_outline_rounded,
+                    color: isFilled ? const Color(0xFFFFB300) : Colors.grey.shade300,
+                    size: 26,
+                  );
+                }),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFB300).withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  "$rating.0 / 5.0",
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFB45309),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Tag Pills
+          if (tagList.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: tagList.map((tag) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFFFE082)),
+                  ),
+                  child: Text(
+                    tag,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1A1A1A),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+
+          // Review Text Comment
+          if (reviewText.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFE082).withOpacity(0.5)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.format_quote_rounded, size: 18, color: Color(0xFFD97706)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      reviewText,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.grey.shade800,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTripRatePromptCard(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFF8E1), Color(0xFFFFF3CD)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFFFD54F)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFB300).withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.star_rounded, color: Color(0xFFD97706), size: 26),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Rate Your Journey",
+                  style: GoogleFonts.poppins(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1A1A1A),
+                  ),
+                ),
+                Text(
+                  "How was your ride with our driver?",
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final updated = await TripFeedbackDialog.show(
+                context,
+                bookingId: booking['id'].toString(),
+                driverName: driver?['full_name'],
+                carType: booking['car_type'],
+                customerPhone: booking['customer_number'] ?? booking['mobile'],
+              );
+              if (updated == true) {
+                _checkAndFetchReview();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFB300),
+              foregroundColor: const Color(0xFF1A1A1A),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.star_rounded, size: 16),
+                const SizedBox(width: 4),
+                Text(
+                  "Rate",
+                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
