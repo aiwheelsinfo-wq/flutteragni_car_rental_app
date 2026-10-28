@@ -22,6 +22,11 @@ class Car {
   final double extraKmAmount;
   final String imageUrl;
   final Map<String, dynamic>? dynamicPricing;
+  final bool advancePaymentActive;
+  final String advancePaymentType;
+  final double advancePaymentValue;
+  final double advanceAmount;
+  final double remainingBalance;
 
   Car({
     required this.name,
@@ -38,6 +43,11 @@ class Car {
     required this.extraKmAmount,
     this.imageUrl = '',
     this.dynamicPricing,
+    this.advancePaymentActive = false,
+    this.advancePaymentType = 'percentage',
+    this.advancePaymentValue = 0.0,
+    this.advanceAmount = 0.0,
+    this.remainingBalance = 0.0,
   });
 
   factory Car.fromJson(Map<String, dynamic> json) {
@@ -57,6 +67,13 @@ class Car {
     final pkgKm = int.tryParse(json['packageKm']?.toString() ?? '0') ?? 0;
     final extraKm = double.tryParse(json['extraKMAmount']?.toString() ?? '0') ?? kmRate;
     final imgUrl = json['imageUrl']?.toString() ?? json['image_url']?.toString() ?? '';
+    final bool advActive = (json['advance_payment_active'] == 1 ||
+        json['advance_payment_active'] == true ||
+        json['advance_payment_active'] == '1');
+    final String advType = json['advance_payment_type']?.toString() ?? 'percentage';
+    final double advVal = double.tryParse(json['advance_payment_value']?.toString() ?? '0') ?? 0.0;
+    final double advAmt = double.tryParse(json['advance_amount']?.toString() ?? '0') ?? 0.0;
+    final double remBal = double.tryParse(json['remaining_balance']?.toString() ?? '0') ?? 0.0;
 
     return Car(
       name: json['carType']?.toString() ?? '',
@@ -75,6 +92,11 @@ class Car {
       dynamicPricing: json['dynamic_pricing'] is Map<String, dynamic>
           ? json['dynamic_pricing']
           : null,
+      advancePaymentActive: advActive,
+      advancePaymentType: advType,
+      advancePaymentValue: advVal,
+      advanceAmount: advAmt,
+      remainingBalance: remBal,
     );
   }
 }
@@ -910,6 +932,11 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
           partPay: partPay,
           bookingId: bookingId ?? "",
           discountedPrice: car.discountedPrice,
+          advancePaymentActive: car.advancePaymentActive,
+          advancePaymentType: car.advancePaymentType,
+          advancePaymentValue: car.advancePaymentValue,
+          advanceAmount: car.advanceAmount,
+          remainingBalance: car.remainingBalance,
         ),
       ),
     );

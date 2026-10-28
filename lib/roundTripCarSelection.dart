@@ -13,6 +13,11 @@ class Car {
   final double driverAllowance;
   final double kmPerDay;
   final String imageUrl;
+  final bool advancePaymentActive;
+  final String advancePaymentType;
+  final double advancePaymentValue;
+  final double advanceAmount;
+  final double remainingBalance;
 
   Car({
     required this.name,
@@ -21,6 +26,11 @@ class Car {
     required this.driverAllowance,
     required this.kmPerDay,
     this.imageUrl = '',
+    this.advancePaymentActive = false,
+    this.advancePaymentType = 'percentage',
+    this.advancePaymentValue = 0.0,
+    this.advanceAmount = 0.0,
+    this.remainingBalance = 0.0,
   });
 
   factory Car.fromJson(Map<String, dynamic> json) {
@@ -32,6 +42,16 @@ class Car {
           double.tryParse(json['driverAllowance']?.toString() ?? '400') ?? 400.0,
       kmPerDay: double.tryParse(json['kmPerDay']?.toString() ?? '0') ?? 0.0,
       imageUrl: json['imageUrl']?.toString() ?? json['image_url']?.toString() ?? '',
+      advancePaymentActive: (json['advance_payment_active'] == 1 ||
+          json['advance_payment_active'] == true ||
+          json['advance_payment_active'] == '1'),
+      advancePaymentType: json['advance_payment_type']?.toString() ?? 'percentage',
+      advancePaymentValue:
+          double.tryParse(json['advance_payment_value']?.toString() ?? '0') ?? 0.0,
+      advanceAmount:
+          double.tryParse(json['advance_amount']?.toString() ?? '0') ?? 0.0,
+      remainingBalance:
+          double.tryParse(json['remaining_balance']?.toString() ?? '0') ?? 0.0,
     );
   }
 }
@@ -450,6 +470,11 @@ class _RoundtripcarselectionState extends State<Roundtripcarselection> {
                   kmRate: car.price,
                   driverAllowance: car.driverAllowance,
                   gstPercent: car.gstPercent,
+                  advancePaymentActive: car.advancePaymentActive,
+                  advancePaymentType: car.advancePaymentType,
+                  advancePaymentValue: car.advancePaymentValue,
+                  advanceAmount: car.advanceAmount,
+                  remainingBalance: car.remainingBalance,
                 ),
               ),
             );

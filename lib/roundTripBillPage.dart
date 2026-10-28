@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -21,6 +22,11 @@ class RoundTripShowBill extends StatefulWidget {
   final double kmRate;
   final double driverAllowance;
   final double gstPercent;
+  final bool advancePaymentActive;
+  final String advancePaymentType;
+  final double advancePaymentValue;
+  final double advanceAmount;
+  final double remainingBalance;
 
   const RoundTripShowBill({
     Key? key,
@@ -35,6 +41,11 @@ class RoundTripShowBill extends StatefulWidget {
     required this.kmRate,
     required this.driverAllowance,
     required this.gstPercent,
+    this.advancePaymentActive = false,
+    this.advancePaymentType = 'percentage',
+    this.advancePaymentValue = 0.0,
+    this.advanceAmount = 0.0,
+    this.remainingBalance = 0.0,
   }) : super(key: key);
 
   @override
@@ -157,7 +168,6 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
 
     double dailyLimit = widget.kmPerDay;
     int days = _calculateDays();
-    double baseAdvance = dailyLimit * 4.0 * days; // ₹4 per KM advance
     double baseFare = dailyLimit * widget.kmRate * days; // e.g. ₹13/KM
     double dailyAllowanceRate = widget.driverAllowance > 0 ? widget.driverAllowance : 400.0;
     double driverAllowance = (dailyAllowanceRate * days) + (_isEarlyMorningTime(widget.departureTime) ? 300.0 : 0.0);
@@ -165,6 +175,20 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
     double vendorEarning = (dailyLimit * 11.0 * days) + driverAllowance; // ₹11 per KM + allowance
     double calculatedCommission = _calculateAgentCommission();
     double totalEstimatedFare = baseFare + driverAllowance + calculatedCommission;
+
+    double advanceRequired = 0.0;
+    if (widget.advancePaymentActive) {
+      if (widget.advancePaymentType == 'fixed') {
+        advanceRequired = widget.advancePaymentValue > 0
+            ? min(totalEstimatedFare, widget.advancePaymentValue)
+            : (widget.advanceAmount > 0 ? widget.advanceAmount : (totalEstimatedFare * 0.15).roundToDouble());
+      } else {
+        double pct = widget.advancePaymentValue > 0 ? widget.advancePaymentValue : 15.0;
+        advanceRequired = (totalEstimatedFare * (pct / 100.0)).roundToDouble();
+      }
+    }
+    double remainingBalance = max(0.0, totalEstimatedFare - advanceRequired);
+    final bool isAdvance = widget.advancePaymentActive && advanceRequired > 0;
 
     try {
       var url = Uri.parse("${ApiConfig.baseUrl}/saveBooking.php");
@@ -183,7 +207,9 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
         "city": cityController.text,
         "pincode": pincodeController.text,
         "agent_commission": calculatedCommission.toStringAsFixed(2),
-        "payment_type": "Pay to Driver",
+        "payment_type": isAdvance ? "Advance" : "Pay to Driver",
+        "paid_amount": isAdvance ? advanceRequired.toStringAsFixed(2) : "0.00",
+        "remaining_balance": isAdvance ? remainingBalance.toStringAsFixed(2) : totalEstimatedFare.toStringAsFixed(2),
         'gst': _showGSTField.toString(),
         'gst_number': gstController.text,
         'business_name': businessNameController.text,
@@ -198,13 +224,29 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
 
       var res = json.decode(response.body);
       if (res["success"] == true) {
-        Navigator.pushReplacement(
+        final bId = (res["booking_id"] ?? "").toString();
+        if (isAdvance && bId.isNotEmpty) {
+          Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-                builder: (context) => const BookingCustomerMessagePage()));
+              builder: (context) => RazorpayPaymentPage(
+                bookingId: bId,
+                amount: advanceRequired,
+                isFullPay: false,
+              ),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const BookingCustomerMessagePage(),
+            ),
+          );
+        }
       } else {
         _showSnackBar(
-            "Booking Failed: ${res['error'] ?? 'Unknown error'}", Colors.red);
+            "Booking Failed: ${res['error'] ?? res['message'] ?? 'Unknown error'}", Colors.red);
       }
     } catch (e) {
       _showSnackBar("Connection error. Please try again.", Colors.red);
@@ -524,9 +566,25 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
   }
 
   Widget _buildBottomAction() {
-    double dailyLimit = widget.kmPerDay;
     int days = _calculateDays();
-    double baseAdvance = dailyLimit * 4.0 * days;
+    double baseFare = widget.kmPerDay * widget.kmRate * days;
+    double dailyAllowanceRate = widget.driverAllowance > 0 ? widget.driverAllowance : 400.0;
+    double driverAllowance = (dailyAllowanceRate * days) + (_isEarlyMorningTime(widget.departureTime) ? 300.0 : 0.0);
+    double calculatedCommission = _calculateAgentCommission();
+    double totalEstimatedFare = baseFare + driverAllowance + calculatedCommission;
+
+    double advanceRequired = 0.0;
+    if (widget.advancePaymentActive) {
+      if (widget.advancePaymentType == 'fixed') {
+        advanceRequired = widget.advancePaymentValue > 0
+            ? min(totalEstimatedFare, widget.advancePaymentValue)
+            : (widget.advanceAmount > 0 ? widget.advanceAmount : (totalEstimatedFare * 0.15).roundToDouble());
+      } else {
+        double pct = widget.advancePaymentValue > 0 ? widget.advancePaymentValue : 15.0;
+        advanceRequired = (totalEstimatedFare * (pct / 100.0)).roundToDouble();
+      }
+    }
+    final bool isAdvance = widget.advancePaymentActive && advanceRequired > 0;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -547,7 +605,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
               ? null
               : () {
                   if (_formKey.currentState!.validate()) {
-                    _submitBooking(0); // Pass necessary amount if required
+                    _submitBooking(advanceRequired);
                   }
                 },
           style: ElevatedButton.styleFrom(
@@ -562,11 +620,25 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
                   width: 20,
                   child: CircularProgressIndicator(
                       color: primaryAmber, strokeWidth: 2))
-              : Text("CONFIRM BOOKING",
-                  style: GoogleFonts.poppins(
-                      color: primaryAmber,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16)),
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (isAdvance) ...[
+                      const Icon(Icons.payment_rounded, color: primaryAmber, size: 20),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      isAdvance
+                          ? "PAY ADVANCE & BOOK (₹${advanceRequired.toStringAsFixed(0)})"
+                          : "CONFIRM BOOKING (PAY TO DRIVER)",
+                      style: GoogleFonts.poppins(
+                        color: primaryAmber,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14.5,
+                      ),
+                    ),
+                  ],
+                ),
         ),
       ),
     );
@@ -581,6 +653,20 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
     bool isEarlyMorning = _isEarlyMorningTime(widget.departureTime);
     double calculatedCommission = _calculateAgentCommission();
     double totalEst = baseFare + driverAllowance + (isEarlyMorning ? 300.0 : 0.0) + calculatedCommission;
+
+    double advanceRequired = 0.0;
+    if (widget.advancePaymentActive) {
+      if (widget.advancePaymentType == 'fixed') {
+        advanceRequired = widget.advancePaymentValue > 0
+            ? min(totalEst, widget.advancePaymentValue)
+            : (widget.advanceAmount > 0 ? widget.advanceAmount : (totalEst * 0.15).roundToDouble());
+      } else {
+        double pct = widget.advancePaymentValue > 0 ? widget.advancePaymentValue : 15.0;
+        advanceRequired = (totalEst * (pct / 100.0)).roundToDouble();
+      }
+    }
+    double remainingBalance = max(0.0, totalEst - advanceRequired);
+    final bool isAdvance = widget.advancePaymentActive && advanceRequired > 0;
 
     return Container(
       margin: const EdgeInsets.only(top: 20),
@@ -627,8 +713,15 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
             ),
           ],
           const Divider(height: 16),
-          _buildBreakdownRow("Advance Required", "₹0 (Free Booking)",
-              subtitle: "No online payment required now"),
+          _buildBreakdownRow(
+            "Advance Required",
+            isAdvance
+                ? "₹${advanceRequired.toStringAsFixed(0)} (Online via Razorpay)"
+                : "₹0 (Free Booking)",
+            subtitle: isAdvance
+                ? "Advance secures your cab with Rentox"
+                : "No online payment required now",
+          ),
           if (userType == "agent") ...[
             const Divider(height: 16),
             _buildBreakdownRow(
@@ -653,7 +746,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
               ),
               const SizedBox(width: 8),
               Text(
-                "₹0",
+                isAdvance ? "₹${advanceRequired.toStringAsFixed(0)}" : "₹0",
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
@@ -678,7 +771,7 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
               ),
               const SizedBox(width: 8),
               Text(
-                "₹${totalEst.toStringAsFixed(0)}",
+                "₹${remainingBalance.toStringAsFixed(0)}",
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -705,7 +798,9 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        "Pay on Trip End: No advance payment required. Pay estimated ₹${totalEst.toStringAsFixed(0)} directly to your driver via Cash or UPI upon trip completion.",
+                        isAdvance
+                            ? "Customer Advance (Mode 2): Pay ₹${advanceRequired.toStringAsFixed(0)} advance online now via Razorpay. The remaining estimated balance of ₹${remainingBalance.toStringAsFixed(0)} is payable directly to your driver upon trip completion."
+                            : "Pay on Trip End (Mode 1): No advance payment required. Pay estimated ₹${totalEst.toStringAsFixed(0)} directly to your driver via Cash or UPI upon trip completion.",
                         style: GoogleFonts.poppins(
                           fontSize: 11,
                           color: Colors.green[900],

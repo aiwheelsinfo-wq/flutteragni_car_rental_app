@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 import 'package:agni_car_rental/config/api_config.dart';
 import 'RazorpayPaymentPage.dart';
 import 'BookingCustomerMessagePage.dart';
@@ -22,6 +23,11 @@ class ShowBillPage extends StatefulWidget {
   final double partPay;
   final String bookingId;
   final double? discountedPrice;
+  final bool advancePaymentActive;
+  final String advancePaymentType;
+  final double advancePaymentValue;
+  final double advanceAmount;
+  final double remainingBalance;
 
   ShowBillPage({
     required this.carType,
@@ -38,6 +44,11 @@ class ShowBillPage extends StatefulWidget {
     required this.partPay,
     required this.bookingId,
     this.discountedPrice,
+    this.advancePaymentActive = false,
+    this.advancePaymentType = 'percentage',
+    this.advancePaymentValue = 0.0,
+    this.advanceAmount = 0.0,
+    this.remainingBalance = 0.0,
   });
 
   @override
@@ -131,19 +142,43 @@ class _ShowBillPageState extends State<ShowBillPage> {
     }
   }
 
+  double _calculateAdvanceRequired() {
+    if (!widget.advancePaymentActive) return 0.0;
+    if (widget.advancePaymentType == 'fixed') {
+      return widget.advancePaymentValue > 0
+          ? min(widget.totalAmount, widget.advancePaymentValue)
+          : (widget.advanceAmount > 0
+              ? widget.advanceAmount
+              : (widget.totalAmount * 0.15).roundToDouble());
+    } else {
+      double pct = widget.advancePaymentValue > 0
+          ? widget.advancePaymentValue
+          : 15.0;
+      return (widget.totalAmount * (pct / 100.0)).roundToDouble();
+    }
+  }
+
+  double _calculateRemainingBalance() {
+    return max(0.0, widget.totalAmount - _calculateAdvanceRequired());
+  }
+
+  bool get _isAdvanceMode =>
+      widget.advancePaymentActive && _calculateAdvanceRequired() > 0;
+
   Future<void> _submitBooking() async {
     setState(() => _isWaiting = true);
     
     double commissionWithTax = widget.commission * 1.05;
     double baseTripFare = widget.totalAmount - commissionWithTax;
-    double advanceAmount = baseTripFare * 0.25;
-    double gstAmount = baseTripFare * 0.05;
-    double payableNow = advanceAmount + gstAmount;
 
     // Vendor Earnings = 90% of Base Trip Fare
     double vendorEarnings = baseTripFare * 0.90;
     // Platform Commission = 10% of Base Trip Fare
     double platformCommission = baseTripFare * 0.10;
+
+    final double advanceRequired = _calculateAdvanceRequired();
+    final double remainingBalance = _calculateRemainingBalance();
+    final bool isAdvance = _isAdvanceMode;
 
     var url = Uri.parse("${ApiConfig.baseUrl}/saveBooking.php");
     try {
@@ -157,7 +192,7 @@ class _ShowBillPageState extends State<ShowBillPage> {
         "tripTime": widget.tripTime,
         "name": nameController.text,
         "email": emailController.text,
-        "userNumber": savedNumber,
+        "userNumber": savedNumber ?? customerMobController.text,
         "pincode": pincodeController.text,
         "base_charge": ((baseTripFare - widget.tollCharge - widget.driverTa) > 0
                 ? (baseTripFare - widget.tollCharge - widget.driverTa)
@@ -166,7 +201,11 @@ class _ShowBillPageState extends State<ShowBillPage> {
         "driver_ta": widget.driverTa.toString(),
         "toll_charge": widget.tollCharge.toString(),
         "total_amount": widget.totalAmount.toString(),
-        "payment_type": "Pay to Driver",
+        "payment_type": isAdvance ? "Advance" : "Pay to Driver",
+        "paid_amount": isAdvance ? advanceRequired.toStringAsFixed(2) : "0.00",
+        "remaining_balance": isAdvance
+            ? remainingBalance.toStringAsFixed(2)
+            : widget.totalAmount.toStringAsFixed(2),
         "agent_commission": widget.commission.toString(),
         "city": cityController.text,
         "agni_amount": platformCommission.toStringAsFixed(2),
@@ -184,16 +223,32 @@ class _ShowBillPageState extends State<ShowBillPage> {
       var responseData = json.decode(response.body);
 
       if (responseData["success"] == true) {
-        Navigator.pushReplacement(
+        final bId = (responseData["booking_id"] ?? widget.bookingId).toString();
+        if (isAdvance && bId.isNotEmpty) {
+          Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-                builder: (context) => const BookingCustomerMessagePage()));
+              builder: (context) => RazorpayPaymentPage(
+                bookingId: bId,
+                amount: advanceRequired,
+                isFullPay: false,
+              ),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const BookingCustomerMessagePage(),
+            ),
+          );
+        }
       } else {
-        throw Exception();
+        throw Exception(responseData['message'] ?? responseData['error'] ?? 'Booking failed');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text("Booking Failed! Please try again."),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Booking Failed! ${e.toString().replaceAll('Exception: ', '')}"),
           backgroundColor: Colors.red));
     } finally {
       setState(() => _isWaiting = false);
@@ -202,6 +257,10 @@ class _ShowBillPageState extends State<ShowBillPage> {
 
   void _showBookingConfirmationDialog() {
     if (!_formKey.currentState!.validate()) return;
+
+    final double advanceRequired = _calculateAdvanceRequired();
+    final double remainingBalance = _calculateRemainingBalance();
+    final bool isAdvance = _isAdvanceMode;
 
     showModalBottomSheet(
       context: context,
@@ -219,11 +278,14 @@ class _ShowBillPageState extends State<ShowBillPage> {
                     color: Colors.grey[300],
                     borderRadius: BorderRadius.circular(10))),
             const SizedBox(height: 20),
-            Text("Confirm Your Booking",
+            Text(isAdvance ? "Pay Advance & Confirm" : "Confirm Your Booking",
                 style: GoogleFonts.poppins(
                     fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            Text("No advance payment required! Pay estimated ₹${widget.totalAmount.toStringAsFixed(0)} directly to your driver via Cash or UPI upon trip completion.\n(Final fare may adjust based on actual route & trip metrics)",
+            Text(
+                isAdvance
+                    ? "Pay ₹${advanceRequired.toStringAsFixed(0)} advance online now via Razorpay to secure your cab booking.\nThe remaining balance of ₹${remainingBalance.toStringAsFixed(0)} is payable directly to your driver upon trip completion."
+                    : "No advance payment required! Pay estimated ₹${widget.totalAmount.toStringAsFixed(0)} directly to your driver via Cash or UPI upon trip completion.\n(Final fare may adjust based on actual route & trip metrics)",
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[700])),
             const SizedBox(height: 20),
@@ -250,8 +312,16 @@ class _ShowBillPageState extends State<ShowBillPage> {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text("Confirm & Book",
-                        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        isAdvance
+                            ? "Pay Advance (₹${advanceRequired.toStringAsFixed(0)})"
+                            : "Confirm & Book",
+                        style: const TextStyle(
+                            color: Colors.black, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -349,10 +419,9 @@ class _ShowBillPageState extends State<ShowBillPage> {
   Widget _buildTripSummaryCard() {
     double commissionWithTax = widget.commission * 1.05;
     double baseTripFare = widget.totalAmount - commissionWithTax;
-    double advanceAmount = baseTripFare * 0.25;
-    double gstAmount = baseTripFare * 0.05;
-    double payableNow = advanceAmount + gstAmount;
-    double remainingBalance = widget.totalAmount - advanceAmount;
+    final double advanceRequired = _calculateAdvanceRequired();
+    final double remainingBalance = _calculateRemainingBalance();
+    final bool isAdvance = _isAdvanceMode;
 
     return Container(
       decoration: BoxDecoration(
@@ -452,7 +521,10 @@ class _ShowBillPageState extends State<ShowBillPage> {
                             color: Colors.amber[900]),
                       ),
                       const SizedBox(height: 12),
-                      _buildFareRow("Advance Required", 0),
+                      _buildFareRow(
+                        "Advance Required",
+                        isAdvance ? advanceRequired : 0,
+                      ),
                       _buildFareRow("Tolls, Taxes & Driver TA", 0),
                       const Divider(height: 20),
                       Row(
@@ -466,7 +538,10 @@ class _ShowBillPageState extends State<ShowBillPage> {
                                     color: Colors.green[800])),
                           ),
                           const SizedBox(width: 8),
-                          Text("₹0",
+                          Text(
+                              isAdvance
+                                  ? "₹${advanceRequired.toStringAsFixed(0)}"
+                                  : "₹0",
                               style: GoogleFonts.poppins(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w900,
@@ -485,7 +560,7 @@ class _ShowBillPageState extends State<ShowBillPage> {
                                     color: Colors.grey[700])),
                           ),
                           const SizedBox(width: 8),
-                          Text("₹${widget.totalAmount.toStringAsFixed(0)}",
+                          Text("₹${remainingBalance.toStringAsFixed(0)}",
                               style: GoogleFonts.poppins(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
@@ -510,7 +585,9 @@ class _ShowBillPageState extends State<ShowBillPage> {
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    "Pay on Trip End: No advance required. Pay estimated ₹${widget.totalAmount.toStringAsFixed(0)} directly to your driver via Cash or UPI upon trip completion.",
+                                    isAdvance
+                                        ? "Customer Advance (Mode 2): Pay ₹${advanceRequired.toStringAsFixed(0)} advance online now via Razorpay. The remaining estimated balance of ₹${remainingBalance.toStringAsFixed(0)} is payable directly to your driver upon trip completion."
+                                        : "Pay on Trip End (Mode 1): No advance required. Pay estimated ₹${widget.totalAmount.toStringAsFixed(0)} directly to your driver via Cash or UPI upon trip completion.",
                                     style: GoogleFonts.poppins(
                                       fontSize: 11,
                                       color: Colors.green[900],
@@ -775,11 +852,8 @@ class _ShowBillPageState extends State<ShowBillPage> {
   }
 
   Widget _buildConfirmButton() {
-    double commissionWithTax = widget.commission * 1.05;
-    double baseTripFare = widget.totalAmount - commissionWithTax;
-    double advanceAmount = baseTripFare * 0.25;
-    double gstAmount = baseTripFare * 0.05;
-    double payableNow = advanceAmount + gstAmount;
+    final double advanceRequired = _calculateAdvanceRequired();
+    final bool isAdvance = _isAdvanceMode;
 
     return SizedBox(
       width: double.infinity,
@@ -798,17 +872,25 @@ class _ShowBillPageState extends State<ShowBillPage> {
           fit: BoxFit.scaleDown,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
+            children: [
+              if (isAdvance) ...[
+                const Icon(Icons.payment_rounded, color: Colors.black, size: 20),
+                const SizedBox(width: 8),
+              ],
               Text(
-                "CONFIRM BOOKING (₹0 ADVANCE)",
-                style: TextStyle(
+                isAdvance
+                    ? "PAY ADVANCE & BOOK (₹${advanceRequired.toStringAsFixed(0)})"
+                    : "CONFIRM BOOKING (PAY TO DRIVER)",
+                style: const TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 15,
                   letterSpacing: 0.5,
                 ),
               ),
-              SizedBox(width: 8),
-              Icon(Icons.arrow_forward, size: 20),
+              if (!isAdvance) ...[
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_forward, size: 20),
+              ],
             ],
           ),
         ),
