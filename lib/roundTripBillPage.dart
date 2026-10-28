@@ -193,6 +193,12 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
         ? widget.remainingBalance
         : max(0.0, totalEstimatedFare - advanceRequired);
     final bool isAdvance = widget.advancePaymentActive && advanceRequired > 0;
+    // Option B: For Advance bookings, Driver earns the Remaining Balance (Total - Advance),
+    // and Rentox retains the Advance Paid online.
+    if (isAdvance) {
+      vendorEarning = remainingBalance;
+      rentoxEarning = advanceRequired;
+    }
 
     try {
       var url = Uri.parse("${ApiConfig.baseUrl}/saveBooking.php");

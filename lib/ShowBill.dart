@@ -176,14 +176,14 @@ class _ShowBillPageState extends State<ShowBillPage> {
     double commissionWithTax = widget.commission * 1.05;
     double baseTripFare = widget.totalAmount - commissionWithTax;
 
-    // Vendor Earnings = 90% of Base Trip Fare
-    double vendorEarnings = baseTripFare * 0.90;
-    // Platform Commission = 10% of Base Trip Fare
-    double platformCommission = baseTripFare * 0.10;
-
     final double advanceRequired = _calculateAdvanceRequired();
     final double remainingBalance = _calculateRemainingBalance();
     final bool isAdvance = _isAdvanceMode;
+
+    // Option B: For Advance bookings, Driver earns the Remaining Balance (Total - Advance),
+    // and Rentox retains the Advance Paid online. For Pay to Driver, standard 90/10 split applies.
+    double vendorEarnings = isAdvance ? remainingBalance : (baseTripFare * 0.90);
+    double platformCommission = isAdvance ? advanceRequired : (baseTripFare * 0.10);
 
     var url = Uri.parse("${ApiConfig.baseUrl}/saveBooking.php");
     try {
