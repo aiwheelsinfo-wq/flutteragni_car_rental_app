@@ -15,6 +15,7 @@ import 'package:share_plus/share_plus.dart';
 import 'cancellationSuccessPage.dart';
 import 'tripDetailsPage.dart';
 import 'trip_feedback_dialog.dart';
+import 'report_driver_dialog.dart';
 
 class BookingStatusPage extends StatefulWidget {
   @override
@@ -27,6 +28,7 @@ class _BookingStatusPageState extends State<BookingStatusPage>
   List<dynamic> pastBookings = [];
   Map<int, int> bookingDiscounts = {};
   final Set<String> _reviewedBookingIds = {};
+  final Set<String> _reportedIncidentBookingIds = {};
 
   bool isLoading = true;
   bool hasError = false;
@@ -191,9 +193,13 @@ class _BookingStatusPageState extends State<BookingStatusPage>
   }
 
   Future<Map<String, dynamic>?> fetchDriverDetails(String driverId) async {
+    final cleanId = driverId.trim();
+    if (cleanId.isEmpty || cleanId == '0' || cleanId == 'null') {
+      return null;
+    }
     try {
       final response = await http.get(Uri.parse(
-          '${ApiConfig.baseUrl}/driverDetails.php?driver_id=$driverId'));
+          '${ApiConfig.baseUrl}/driverDetails.php?driver_id=$cleanId'));
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
         return json["status"] == "success" ? json["data"] : null;
@@ -936,6 +942,19 @@ class _BookingStatusPageState extends State<BookingStatusPage>
       status = 'Confirmed';
     }
     
+    final bool hasDriverAssigned = driver != null ||
+        (booking['driver_id'] != null &&
+            booking['driver_id'].toString().trim().isNotEmpty &&
+            booking['driver_id'].toString().trim() != '0' &&
+            booking['driver_id'].toString().trim() != 'null');
+
+    final String bId = (booking['id'] ?? '').toString();
+    final String bCode = (booking['booking_id'] ?? '').toString();
+    final bool hasReportedIncident = (booking['has_reported_incident'] == true) ||
+        _reportedIncidentBookingIds.contains(bId) ||
+        (bCode.isNotEmpty && _reportedIncidentBookingIds.contains(bCode));
+    final String? incidentTicket = booking['incident_ticket_no']?.toString();
+
     double finalPrice = double.tryParse(booking['total_amount']?.toString() ?? '0') ?? 0.0;
 
     String registrationNumber = 'Allocating...';
@@ -1568,7 +1587,7 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                               () => _showAdvanceReceipt(context, booking)),
                         ),
                       ],
-                      if (!isPast && driver != null) ...[
+                      if (!isPast && (driver != null || hasDriverAssigned)) ...[
                         const SizedBox(width: 8),
                         Expanded(
                           child: _actionButton(
@@ -1581,7 +1600,7 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                                       builder: (_) =>
                                           DriverToPickupMapYellowFinalV2(
                                               driverId:
-                                                  driver?['phone_number'] ?? '',
+                                                  driver?['phone_number'] ?? booking['driver_id']?.toString() ?? '',
                                               bookingId:
                                                   booking['id'].toString())))),
                         ),
@@ -1633,6 +1652,57 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                     ],
                   ),
 
+                  // 5. Safety Concern / Report Driver Button (Shown when Driver Accepted on Upcoming Trip)
+                  if (!isPast && hasDriverAssigned) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: TextButton.icon(
+                        onPressed: () async {
+                          final reported = await ReportDriverDialog.show(
+                            context,
+                            bookingId: booking['id']?.toString() ?? booking['booking_id']?.toString() ?? '',
+                            driverName: driver?['full_name'],
+                            driverId: driver?['phone_number'] ?? driver?['driver_id'] ?? booking['driver_id']?.toString(),
+                            customerPhone: booking['customer_number'] ?? booking['mobile'],
+                          );
+                          if (reported == true) {
+                            setState(() {
+                              _reportedIncidentBookingIds.add(bId);
+                              if (bCode.isNotEmpty) _reportedIncidentBookingIds.add(bCode);
+                              booking['has_reported_incident'] = true;
+                            });
+                            if (phoneNumber != null) {
+                              fetchBookings(phoneNumber!);
+                            }
+                          }
+                        },
+                        icon: Icon(
+                          hasReportedIncident ? Icons.shield_rounded : Icons.shield_outlined,
+                          color: const Color(0xFFDC2626),
+                          size: 18,
+                        ),
+                        label: Text(
+                          hasReportedIncident
+                              ? "Safety Incident Reported (${incidentTicket ?? 'Filed'})"
+                              : "Report Driver / Safety Concern",
+                          style: GoogleFonts.poppins(
+                            color: const Color(0xFFDC2626),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFFFEF2F2),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(color: Color(0xFFFECACA), width: 1.2),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

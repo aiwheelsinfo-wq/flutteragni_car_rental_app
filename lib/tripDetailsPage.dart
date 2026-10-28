@@ -35,10 +35,11 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
   final Color darkCharcoal = const Color(0xFF1C1F26);
 
   Map<String, dynamic> get booking => widget.booking;
-  Map<String, dynamic>? get driver => widget.driver;
+  Map<String, dynamic>? get driver => widget.driver ?? _fetchedDriver;
   bool get isPast => widget.isPast;
   Function(BuildContext, Map<String, dynamic>)? get onCancelBooking => widget.onCancelBooking;
 
+  Map<String, dynamic>? _fetchedDriver;
   Map<String, dynamic>? _existingReview;
   bool _hasReviewed = false;
 
@@ -48,7 +49,26 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
   @override
   void initState() {
     super.initState();
+    _fetchDriverDetailsIfNeeded();
     _checkAndFetchReview();
+  }
+
+  Future<void> _fetchDriverDetailsIfNeeded() async {
+    if (widget.driver != null) return;
+    final dId = (widget.booking['driver_id'] ?? '').toString().trim();
+    if (dId.isEmpty || dId == '0' || dId == 'null') return;
+    try {
+      final url = Uri.parse("${ApiConfig.baseUrl}/driverDetails.php?driver_id=$dId");
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['status'] == 'success' && data['data'] != null && mounted) {
+          setState(() {
+            _fetchedDriver = Map<String, dynamic>.from(data['data']);
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkAndFetchReview() async {
@@ -820,7 +840,7 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        driver!['full_name'] ?? 'Assigned Driver',
+                        driver['full_name'] ?? 'Assigned Driver',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -893,17 +913,17 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
                 ],
               ),
             ),
-            if (double.tryParse(booking['driver_latitude']?.toString() ?? driver?['latitude']?.toString() ?? '') != null &&
-                double.tryParse(booking['driver_longitude']?.toString() ?? driver?['longitude']?.toString() ?? '') != null)
+            if (double.tryParse(booking['driver_latitude']?.toString() ?? driver['latitude']?.toString() ?? '') != null &&
+                double.tryParse(booking['driver_longitude']?.toString() ?? driver['longitude']?.toString() ?? '') != null)
               FutureBuilder<String>(
                 future: _getDriverAddress(
-                  double.parse((booking['driver_latitude'] ?? driver!['latitude']).toString()),
-                  double.parse((booking['driver_longitude'] ?? driver!['longitude']).toString()),
+                  double.parse((booking['driver_latitude'] ?? driver['latitude']).toString()),
+                  double.parse((booking['driver_longitude'] ?? driver['longitude']).toString()),
                 ),
                 builder: (context, snapshot) {
                   if (snapshot.hasData) {
-                    final lat = (booking['driver_latitude'] ?? driver!['latitude']).toString();
-                    final lng = (booking['driver_longitude'] ?? driver!['longitude']).toString();
+                    final lat = (booking['driver_latitude'] ?? driver['latitude']).toString();
+                    final lng = (booking['driver_longitude'] ?? driver['longitude']).toString();
                     return Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: InkWell(
@@ -1287,6 +1307,13 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
   Widget _buildActionButtons(BuildContext context, String status) {
     final bool canCancel = !isPast && !_isCancelled(status) && status != 'Completed';
     final bool isCompleted = status == 'Completed';
+    final bool isDriverAssigned = driver != null ||
+        _fetchedDriver != null ||
+        (booking['driver_id'] != null &&
+            booking['driver_id'].toString().trim().isNotEmpty &&
+            booking['driver_id'].toString().trim() != '0' &&
+            booking['driver_id'].toString().trim() != 'null');
+    final Map<String, dynamic>? activeDriver = driver ?? _fetchedDriver;
 
     return Column(
       children: [
@@ -1313,15 +1340,16 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
             const SizedBox(width: 10),
 
             // Live Tracking or Invoice
-            if (!isPast && driver != null) ...[
+            if (!isPast && (driver != null || isDriverAssigned)) ...[
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
+                    final trackId = activeDriver?['phone_number'] ?? booking['driver_id']?.toString() ?? '';
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => DriverToPickupMapYellowFinalV2(
-                          driverId: driver?['phone_number'] ?? '',
+                          driverId: trackId,
                           bookingId: booking['id'].toString(),
                         ),
                       ),
@@ -1418,8 +1446,8 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
             ],
           ],
         ),
-        // 3. Report Driver / Safety Concern Button
-        if (driver != null || isPast || isCompleted) ...[
+        // 3. Report Driver / Safety Concern Button (Shown when driver is assigned/accepted, or trip was completed)
+        if (isDriverAssigned || isPast || isCompleted) ...[
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
@@ -1429,8 +1457,8 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
                 final reported = await ReportDriverDialog.show(
                   context,
                   bookingId: booking['id']?.toString() ?? booking['booking_id']?.toString() ?? '',
-                  driverName: driver?['full_name'],
-                  driverId: driver?['phone_number'] ?? driver?['driver_id'] ?? booking['driver_id']?.toString(),
+                  driverName: activeDriver?['full_name'],
+                  driverId: activeDriver?['phone_number'] ?? activeDriver?['driver_id'] ?? booking['driver_id']?.toString(),
                   customerPhone: booking['customer_number'] ?? booking['mobile'],
                 );
                 if (reported == true) {
