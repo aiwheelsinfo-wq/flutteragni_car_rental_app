@@ -67,13 +67,27 @@ class Car {
     final pkgKm = int.tryParse(json['packageKm']?.toString() ?? '0') ?? 0;
     final extraKm = double.tryParse(json['extraKMAmount']?.toString() ?? '0') ?? kmRate;
     final imgUrl = json['imageUrl']?.toString() ?? json['image_url']?.toString() ?? '';
+    final advBreakdown = json['advance_breakdown'] is Map ? json['advance_breakdown'] : null;
     final bool advActive = (json['advance_payment_active'] == 1 ||
         json['advance_payment_active'] == true ||
-        json['advance_payment_active'] == '1');
-    final String advType = json['advance_payment_type']?.toString() ?? 'percentage';
-    final double advVal = double.tryParse(json['advance_payment_value']?.toString() ?? '0') ?? 0.0;
-    final double advAmt = double.tryParse(json['advance_amount']?.toString() ?? '0') ?? 0.0;
-    final double remBal = double.tryParse(json['remaining_balance']?.toString() ?? '0') ?? 0.0;
+        json['advance_payment_active'] == '1' ||
+        advBreakdown?['is_active'] == true ||
+        advBreakdown?['is_active'] == 1);
+    final String advType = json['advance_payment_type']?.toString() ??
+        advBreakdown?['type']?.toString() ??
+        'percentage';
+    final double advVal = double.tryParse(json['advance_payment_value']?.toString() ??
+            advBreakdown?['value']?.toString() ??
+            '0') ??
+        0.0;
+    final double advAmt = double.tryParse(json['advance_amount']?.toString() ??
+            advBreakdown?['advance_amount']?.toString() ??
+            '0') ??
+        0.0;
+    final double remBal = double.tryParse(json['remaining_balance']?.toString() ??
+            advBreakdown?['remaining_balance']?.toString() ??
+            '0') ??
+        0.0;
 
     return Car(
       name: json['carType']?.toString() ?? '',

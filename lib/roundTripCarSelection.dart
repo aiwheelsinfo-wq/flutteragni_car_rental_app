@@ -44,14 +44,19 @@ class Car {
       imageUrl: json['imageUrl']?.toString() ?? json['image_url']?.toString() ?? '',
       advancePaymentActive: (json['advance_payment_active'] == 1 ||
           json['advance_payment_active'] == true ||
-          json['advance_payment_active'] == '1'),
-      advancePaymentType: json['advance_payment_type']?.toString() ?? 'percentage',
+          json['advance_payment_active'] == '1' ||
+          (json['advance_breakdown'] is Map && (json['advance_breakdown']['is_active'] == true || json['advance_breakdown']['is_active'] == 1))),
+      advancePaymentType: json['advance_payment_type']?.toString() ??
+          (json['advance_breakdown'] is Map ? json['advance_breakdown']['type']?.toString() ?? 'percentage' : 'percentage'),
       advancePaymentValue:
-          double.tryParse(json['advance_payment_value']?.toString() ?? '0') ?? 0.0,
+          double.tryParse(json['advance_payment_value']?.toString() ??
+              (json['advance_breakdown'] is Map ? json['advance_breakdown']['value']?.toString() ?? '0' : '0')) ?? 0.0,
       advanceAmount:
-          double.tryParse(json['advance_amount']?.toString() ?? '0') ?? 0.0,
+          double.tryParse(json['advance_amount']?.toString() ??
+              (json['advance_breakdown'] is Map ? json['advance_breakdown']['advance_amount']?.toString() ?? '0' : '0')) ?? 0.0,
       remainingBalance:
-          double.tryParse(json['remaining_balance']?.toString() ?? '0') ?? 0.0,
+          double.tryParse(json['remaining_balance']?.toString() ??
+              (json['advance_breakdown'] is Map ? json['advance_breakdown']['remaining_balance']?.toString() ?? '0' : '0')) ?? 0.0,
     );
   }
 }

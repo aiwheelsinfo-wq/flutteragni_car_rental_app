@@ -144,12 +144,13 @@ class _ShowBillPageState extends State<ShowBillPage> {
 
   double _calculateAdvanceRequired() {
     if (!widget.advancePaymentActive) return 0.0;
+    if (widget.advanceAmount > 0) {
+      return min(widget.totalAmount, widget.advanceAmount);
+    }
     if (widget.advancePaymentType == 'fixed') {
       return widget.advancePaymentValue > 0
           ? min(widget.totalAmount, widget.advancePaymentValue)
-          : (widget.advanceAmount > 0
-              ? widget.advanceAmount
-              : (widget.totalAmount * 0.15).roundToDouble());
+          : (widget.totalAmount * 0.15).roundToDouble();
     } else {
       double pct = widget.advancePaymentValue > 0
           ? widget.advancePaymentValue
@@ -159,6 +160,10 @@ class _ShowBillPageState extends State<ShowBillPage> {
   }
 
   double _calculateRemainingBalance() {
+    if (!widget.advancePaymentActive) return widget.totalAmount;
+    if (widget.remainingBalance > 0 && widget.advanceAmount > 0) {
+      return widget.remainingBalance;
+    }
     return max(0.0, widget.totalAmount - _calculateAdvanceRequired());
   }
 

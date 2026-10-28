@@ -1610,44 +1610,10 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                             _reviewedBookingIds.contains(booking['id']?.toString() ?? '') ||
                             _reviewedBookingIds.contains(booking['booking_id']?.toString() ?? ''))) ...[
                           const SizedBox(width: 8),
-                          Expanded(
-                            child: _actionButton(
-                              "Rate Trip",
-                              Icons.star_rounded,
-                              const Color(0xFFFFB300),
-                              () async {
-                                final bId = booking['id'].toString();
-                                final bCode = (booking['booking_id'] ?? '').toString();
-                                final updated = await TripFeedbackDialog.show(
-                                  context,
-                                  bookingId: bId,
-                                  driverName: driver?['full_name'],
-                                  carType: booking['car_type'],
-                                  customerPhone: booking['customer_number'] ?? booking['mobile'],
-                                );
-                                if (updated == true) {
-                                  setState(() {
-                                    _reviewedBookingIds.add(bId);
-                                    if (bCode.isNotEmpty) _reviewedBookingIds.add(bCode);
-                                    booking['has_reviewed'] = true;
-                                  });
-                                }
-                              },
-                            ),
-                          ),
+                       
                         ],
                         const SizedBox(width: 8),
-                        Expanded(
-                          child: _actionButton(
-                              "Invoice",
-                              Icons.receipt_long_outlined,
-                              Colors.yellow[800]!,
-                              () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) => InvoicePage(
-                                          bookingId: booking['id'].toString())))),
-                        ),
+                     
                       ],
                     ],
                   ),

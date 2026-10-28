@@ -178,16 +178,20 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
 
     double advanceRequired = 0.0;
     if (widget.advancePaymentActive) {
-      if (widget.advancePaymentType == 'fixed') {
+      if (widget.advanceAmount > 0) {
+        advanceRequired = min(totalEstimatedFare, widget.advanceAmount);
+      } else if (widget.advancePaymentType == 'fixed') {
         advanceRequired = widget.advancePaymentValue > 0
             ? min(totalEstimatedFare, widget.advancePaymentValue)
-            : (widget.advanceAmount > 0 ? widget.advanceAmount : (totalEstimatedFare * 0.15).roundToDouble());
+            : (totalEstimatedFare * 0.15).roundToDouble();
       } else {
         double pct = widget.advancePaymentValue > 0 ? widget.advancePaymentValue : 15.0;
         advanceRequired = (totalEstimatedFare * (pct / 100.0)).roundToDouble();
       }
     }
-    double remainingBalance = max(0.0, totalEstimatedFare - advanceRequired);
+    double remainingBalance = (widget.advancePaymentActive && widget.remainingBalance > 0 && widget.advanceAmount > 0)
+        ? widget.remainingBalance
+        : max(0.0, totalEstimatedFare - advanceRequired);
     final bool isAdvance = widget.advancePaymentActive && advanceRequired > 0;
 
     try {
@@ -575,10 +579,12 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
 
     double advanceRequired = 0.0;
     if (widget.advancePaymentActive) {
-      if (widget.advancePaymentType == 'fixed') {
+      if (widget.advanceAmount > 0) {
+        advanceRequired = min(totalEstimatedFare, widget.advanceAmount);
+      } else if (widget.advancePaymentType == 'fixed') {
         advanceRequired = widget.advancePaymentValue > 0
             ? min(totalEstimatedFare, widget.advancePaymentValue)
-            : (widget.advanceAmount > 0 ? widget.advanceAmount : (totalEstimatedFare * 0.15).roundToDouble());
+            : (totalEstimatedFare * 0.15).roundToDouble();
       } else {
         double pct = widget.advancePaymentValue > 0 ? widget.advancePaymentValue : 15.0;
         advanceRequired = (totalEstimatedFare * (pct / 100.0)).roundToDouble();
@@ -656,16 +662,20 @@ class _RoundTripShowBillState extends State<RoundTripShowBill> {
 
     double advanceRequired = 0.0;
     if (widget.advancePaymentActive) {
-      if (widget.advancePaymentType == 'fixed') {
+      if (widget.advanceAmount > 0) {
+        advanceRequired = min(totalEst, widget.advanceAmount);
+      } else if (widget.advancePaymentType == 'fixed') {
         advanceRequired = widget.advancePaymentValue > 0
             ? min(totalEst, widget.advancePaymentValue)
-            : (widget.advanceAmount > 0 ? widget.advanceAmount : (totalEst * 0.15).roundToDouble());
+            : (totalEst * 0.15).roundToDouble();
       } else {
         double pct = widget.advancePaymentValue > 0 ? widget.advancePaymentValue : 15.0;
         advanceRequired = (totalEst * (pct / 100.0)).roundToDouble();
       }
     }
-    double remainingBalance = max(0.0, totalEst - advanceRequired);
+    double remainingBalance = (widget.advancePaymentActive && widget.remainingBalance > 0 && widget.advanceAmount > 0)
+        ? widget.remainingBalance
+        : max(0.0, totalEst - advanceRequired);
     final bool isAdvance = widget.advancePaymentActive && advanceRequired > 0;
 
     return Container(
