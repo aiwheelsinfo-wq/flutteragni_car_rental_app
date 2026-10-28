@@ -1293,14 +1293,15 @@ class _BookingStatusPageState extends State<BookingStatusPage>
                       ),
                     );
                   } else {
-                    bool isLocalDuty = (booking['trip_type'] ?? '').toString().toLowerCase().contains('local-duty') || 
-                                       (booking['trip_type'] ?? '').toString().toLowerCase().contains('local duty');
-                    double advancePaid = isLocalDuty
-                        ? (double.tryParse(booking['paid_amount']?.toString() ?? '') ?? 0.0)
-                        : (totalFare * 0.30);
-                    double remaining = isLocalDuty
-                        ? (totalFare - advancePaid)
-                        : (totalFare * 0.75);
+                    double advancePaid = double.tryParse(booking['paid_amount']?.toString() ?? '') ?? 0.0;
+                    if (advancePaid == 0.0 && booking['payment_type'] == 'Advance') {
+                      advancePaid = double.tryParse(booking['advance_amount']?.toString() ?? '') ?? 0.0;
+                    }
+                    double remaining = double.tryParse(booking['remaining_balance']?.toString() ?? '') ?? 
+                        max(0.0, totalFare - advancePaid);
+                    if (remaining <= 0 && totalFare > advancePaid && advancePaid > 0) {
+                      remaining = max(0.0, totalFare - advancePaid);
+                    }
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       child: Container(
@@ -1965,17 +1966,15 @@ Thank you for choosing Rentox system!
       return;
     }
 
-    bool isLocalDuty = (booking['trip_type'] ?? '').toString().toLowerCase().contains('local-duty') || 
-                       (booking['trip_type'] ?? '').toString().toLowerCase().contains('local duty');
     double totalFare = double.tryParse(booking['total_amount']?.toString() ?? '0') ?? 0.0;
-    double advancePaid = isLocalDuty 
-        ? (double.tryParse(booking['paid_amount']?.toString() ?? '') ?? 0.0)
-        : (double.tryParse(booking['agni_amount']?.toString() ?? '0') ?? (totalFare * 0.30));
-    double remaining = isLocalDuty
-        ? (totalFare - advancePaid)
-        : (double.tryParse(booking['vendor_amount']?.toString() ?? '0') ?? (totalFare * 0.75));
-    double baseAdvance = isLocalDuty ? advancePaid : (totalFare * 0.25);
-    double gst = isLocalDuty ? 0.0 : (totalFare * 0.05);
+    double advancePaid = double.tryParse(booking['paid_amount']?.toString() ?? '') ?? 0.0;
+    if (advancePaid == 0.0 && booking['payment_type'] == 'Advance') {
+      advancePaid = double.tryParse(booking['advance_amount']?.toString() ?? '') ?? 0.0;
+    }
+    double remaining = double.tryParse(booking['remaining_balance']?.toString() ?? '') ?? (totalFare - advancePaid);
+    if (remaining <= 0 && totalFare > advancePaid && advancePaid > 0) {
+      remaining = max(0.0, totalFare - advancePaid);
+    }
 
     showModalBottomSheet(
       context: context,
@@ -2041,15 +2040,14 @@ Thank you for choosing Rentox system!
                 _buildReceiptRow("Route", "${booking['from_address']} to ${booking['to_address'] ?? 'Local'}"),
                 const Divider(height: 20),
                 _buildReceiptRow("Total Trip Fare", "₹${totalFare.toStringAsFixed(2)}"),
-                _buildReceiptRow(isLocalDuty ? "Advance" : "Advance (25%)", "₹${baseAdvance.toStringAsFixed(2)}"),
-                if (!isLocalDuty) _buildReceiptRow("GST (5%)", "₹${gst.toStringAsFixed(2)}"),
+                _buildReceiptRow("Advance Required", "₹${advancePaid.toStringAsFixed(2)}"),
                 const Divider(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
                       child: Text(
-                        isLocalDuty ? "Paid Amount Now" : "Paid Amount Now (30%)",
+                        "Paid Amount Now",
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -2069,7 +2067,7 @@ Thank you for choosing Rentox system!
                   ],
                 ),
                 const SizedBox(height: 8),
-                _buildReceiptRow("Remaining Balance (75%)", "₹${remaining.toStringAsFixed(2)}"),
+                _buildReceiptRow("Remaining Balance", "₹${remaining.toStringAsFixed(2)}"),
                 const Divider(height: 30),
                 SizedBox(
                   width: double.infinity,
@@ -2088,11 +2086,8 @@ Car Type: ${booking['car_type']}
 
 Fare Details:
 Total Trip Fare: ₹${totalFare.toStringAsFixed(2)}
-Advance (25%): ₹${baseAdvance.toStringAsFixed(2)}
-GST (5%): ₹${gst.toStringAsFixed(2)}
--------------------------------
-Amount Paid: ₹${advancePaid.toStringAsFixed(2)} (SUCCESS)
-Remaining Balance: ₹${remaining.toStringAsFixed(2)}
+Advance Amount Paid: ₹${advancePaid.toStringAsFixed(2)} (SUCCESS)
+Remaining Balance: ₹${remaining.toStringAsFixed(2)} (Pay to Driver at Trip End)
 -------------------------------
 Thank you for choosing Rentox system!
 """;

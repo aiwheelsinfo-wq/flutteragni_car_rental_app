@@ -136,7 +136,7 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
     final double gpsKm = double.tryParse((booking['gps_accumulated_km'] ?? '0').toString()) ?? 0.0;
     final double totalAmount = double.tryParse(booking['total_amount']?.toString() ?? '0') ?? 0.0;
     final double paidAmount = double.tryParse(booking['paid_amount']?.toString() ?? '') ??
-        (booking['payment_type'] == 'Advance' ? totalAmount : 0.0);
+        (booking['payment_type'] == 'Advance' ? (double.tryParse(booking['advance_amount']?.toString() ?? '') ?? 0.0) : 0.0);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -1108,7 +1108,9 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
   }
 
   Widget _buildFareBreakdownCard(double total, double paid, String tripType) {
-    final double balance = (total - paid).clamp(0, double.infinity);
+    final double balance = (booking['remaining_balance'] != null && double.tryParse(booking['remaining_balance'].toString()) != null)
+        ? double.parse(booking['remaining_balance'].toString())
+        : (total - paid).clamp(0, double.infinity);
     final String paymentType = booking['payment_type'] ?? 'Cash / Post-Trip';
 
     return Container(

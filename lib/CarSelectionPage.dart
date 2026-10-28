@@ -491,7 +491,13 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
                                 double commissionWithTax = commissionAmount * 1.05;
                                 double totalPrice = carTripFare + commissionWithTax;
                                 double baselinePrice = baselineFare + commissionWithTax;
-                                double partPay = totalPrice * 0.30;
+                                double partPay = car.advancePaymentActive
+                                    ? (car.advanceAmount > 0
+                                        ? car.advanceAmount
+                                        : (car.advancePaymentType == 'fixed'
+                                            ? car.advancePaymentValue
+                                            : (totalPrice * (car.advancePaymentValue > 0 ? car.advancePaymentValue / 100.0 : 0.15))))
+                                    : 0.0;
 
                                 return _buildModernCarCard(
                                   car: car,
