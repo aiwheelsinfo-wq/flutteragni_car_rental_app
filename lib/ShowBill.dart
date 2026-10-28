@@ -181,8 +181,11 @@ class _ShowBillPageState extends State<ShowBillPage> {
     final bool isAdvance = _isAdvanceMode;
 
     // Option B: For Advance bookings, Driver earns the Remaining Balance (Total - Advance),
-    // and Rentox retains the Advance Paid online. For Pay to Driver, standard 90/10 split applies.
-    double vendorEarnings = isAdvance ? remainingBalance : (baseTripFare * 0.90);
+    // strictly EXCLUDING any agent commission added by an agent.
+    // For Pay to Driver, standard 90/10 split on baseTripFare applies.
+    double vendorEarnings = isAdvance
+        ? max(0.0, remainingBalance - commissionWithTax)
+        : (baseTripFare * 0.90);
     double platformCommission = isAdvance ? advanceRequired : (baseTripFare * 0.10);
 
     var url = Uri.parse("${ApiConfig.baseUrl}/saveBooking.php");
