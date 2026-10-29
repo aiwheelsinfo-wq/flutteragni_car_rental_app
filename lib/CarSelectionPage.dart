@@ -367,13 +367,12 @@ class _CarSelectionPageState extends State<CarSelectionPage> {
       }).toList();
     }
 
-    if (selectedSortOption == "price_asc") {
-      list.sort((a, b) {
-        double priceA = a.discountedPrice > 0 ? a.discountedPrice : ((a.price * numericDistance * 1.05) + baseCharge);
-        double priceB = b.discountedPrice > 0 ? b.discountedPrice : ((b.price * numericDistance * 1.05) + baseCharge);
-        return priceA.compareTo(priceB);
-      });
-    }
+    // Sort from Low to High (Price Ascending) by default
+    list.sort((a, b) {
+      double priceA = a.discountedPrice > 0 ? a.discountedPrice : ((a.price * numericDistance * 1.05) + baseCharge);
+      double priceB = b.discountedPrice > 0 ? b.discountedPrice : ((b.price * numericDistance * 1.05) + baseCharge);
+      return priceA.compareTo(priceB);
+    });
 
     return list;
   }

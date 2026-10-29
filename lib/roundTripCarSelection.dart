@@ -209,6 +209,13 @@ class _RoundtripcarselectionState extends State<Roundtripcarselection> {
       }).toList();
     }
 
+    // Sort from Low to High (Rate / KM Ascending) by default
+    list.sort((a, b) {
+      int cmp = a.price.compareTo(b.price);
+      if (cmp != 0) return cmp;
+      return a.driverAllowance.compareTo(b.driverAllowance);
+    });
+
     return list;
   }
 

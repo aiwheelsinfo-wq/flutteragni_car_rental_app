@@ -496,6 +496,15 @@ class _LocalTaxiState extends State<LocalTaxi> {
             });
           }
 
+          // Sort from Low to High (Price Ascending)
+          parsedFares.sort((a, b) {
+            double priceA = (a["discounted_price"] as num?)?.toDouble() ??
+                (a["original_price"] as num?)?.toDouble() ?? 0.0;
+            double priceB = (b["discounted_price"] as num?)?.toDouble() ??
+                (b["original_price"] as num?)?.toDouble() ?? 0.0;
+            return priceA.compareTo(priceB);
+          });
+
           setState(() {
             carFares = parsedFares;
             currentCalculatedDistance = distance;

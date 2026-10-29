@@ -371,8 +371,15 @@ class _LocalDutyBookingFormState extends State<LocalDutyBookingForm> {
           '${ApiConfig.baseUrl}/selectCarCostList.php?tripType=Local-Duty'));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
+        List<Car> loadedCars = data.map((item) => Car.fromJson(item)).toList();
+        // Sort from Low to High (Price Ascending)
+        loadedCars.sort((a, b) {
+          double priceA = a.discountedPrice > 0 ? a.discountedPrice : a.base;
+          double priceB = b.discountedPrice > 0 ? b.discountedPrice : b.base;
+          return priceA.compareTo(priceB);
+        });
         setState(() {
-          cars = data.map((item) => Car.fromJson(item)).toList();
+          cars = loadedCars;
           if (cars.isNotEmpty) selectedCar = cars.first;
           isLoading = false;
         });
