@@ -46,8 +46,9 @@ class _ReportDriverDialogState extends State<ReportDriverDialog> {
   final TextEditingController _detailsController = TextEditingController();
   bool _isSubmitting = false;
 
-  String _selectedCategory = 'Reckless Driving / Overspeeding';
+  final Set<String> _selectedCategories = {'Reckless Driving / Overspeeding'};
   String _selectedSeverity = 'High';
+  bool _userOverrodeSeverity = false;
   String? _validationError;
 
   final List<Map<String, String>> _categories = [
@@ -95,6 +96,39 @@ class _ReportDriverDialogState extends State<ReportDriverDialog> {
     },
   ];
 
+  void _updateSeverityFromCategories() {
+    if (_userOverrodeSeverity) return;
+    int maxRank = 0;
+    // Low: 1, Medium: 2, High: 3, Critical: 4
+    for (var catId in _selectedCategories) {
+      final cat = _categories.firstWhere(
+        (c) => c['id'] == catId,
+        orElse: () => {'defaultSeverity': 'Medium'},
+      );
+      final sev = cat['defaultSeverity'] ?? 'Medium';
+      int rank = 1;
+      if (sev == 'Medium') {
+        rank = 2;
+      } else if (sev == 'High') {
+        rank = 3;
+      } else if (sev == 'Critical') {
+        rank = 4;
+      }
+      if (rank > maxRank) {
+        maxRank = rank;
+      }
+    }
+    if (maxRank == 4) {
+      _selectedSeverity = 'Critical';
+    } else if (maxRank == 3) {
+      _selectedSeverity = 'High';
+    } else if (maxRank == 2) {
+      _selectedSeverity = 'Medium';
+    } else if (maxRank == 1) {
+      _selectedSeverity = 'Low';
+    }
+  }
+
   @override
   void dispose() {
     _detailsController.dispose();
@@ -102,6 +136,13 @@ class _ReportDriverDialogState extends State<ReportDriverDialog> {
   }
 
   Future<void> _submitReport() async {
+    if (_selectedCategories.isEmpty) {
+      setState(() {
+        _validationError = "Please select at least one reason before submitting.";
+      });
+      return;
+    }
+
     final details = _detailsController.text.trim();
     if (details.isEmpty) {
       setState(() {
@@ -118,6 +159,8 @@ class _ReportDriverDialogState extends State<ReportDriverDialog> {
       _isSubmitting = true;
     });
 
+    final joinedCategories = _selectedCategories.join(', ');
+
     try {
       final url = Uri.parse("${ApiConfig.baseUrl}/submit_incident_report.php");
       final response = await http.post(
@@ -128,7 +171,8 @@ class _ReportDriverDialogState extends State<ReportDriverDialog> {
           "customer_phone": widget.customerPhone ?? '',
           "driver_id": widget.driverId ?? '',
           "driver_name": widget.driverName ?? '',
-          "incident_type": _selectedCategory,
+          "incident_type": joinedCategories,
+          "incident_types": _selectedCategories.toList(),
           "severity": _selectedSeverity,
           "description": details,
         }),
@@ -322,21 +366,43 @@ class _ReportDriverDialogState extends State<ReportDriverDialog> {
             const SizedBox(height: 16),
 
             // Category Selection
-            Text(
-              "What went wrong?",
-              style: GoogleFonts.poppins(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF1A1A1A),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "What went wrong?",
+                  style: GoogleFonts.poppins(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1A1A1A),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _selectedCategories.isNotEmpty ? const Color(0xFFFEE2E2) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _selectedCategories.isEmpty
+                        ? "Select all that apply"
+                        : "${_selectedCategories.length} selected",
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _selectedCategories.isNotEmpty ? const Color(0xFFDC2626) : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: _categories.map((cat) {
-                final isSelected = _selectedCategory == cat['id'];
-                return ChoiceChip(
+                final isSelected = _selectedCategories.contains(cat['id']);
+                return FilterChip(
                   label: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -353,6 +419,8 @@ class _ReportDriverDialogState extends State<ReportDriverDialog> {
                     ],
                   ),
                   selected: isSelected,
+                  showCheckmark: true,
+                  checkmarkColor: const Color(0xFFDC2626),
                   selectedColor: const Color(0xFFFEE2E2),
                   backgroundColor: const Color(0xFFF8FAFC),
                   shape: RoundedRectangleBorder(
@@ -363,12 +431,24 @@ class _ReportDriverDialogState extends State<ReportDriverDialog> {
                     ),
                   ),
                   onSelected: (selected) {
-                    if (selected) {
-                      setState(() {
-                        _selectedCategory = cat['id']!;
-                        _selectedSeverity = cat['defaultSeverity'] ?? 'Medium';
-                      });
-                    }
+                    setState(() {
+                      if (selected) {
+                        _selectedCategories.add(cat['id']!);
+                      } else {
+                        if (_selectedCategories.length > 1) {
+                          _selectedCategories.remove(cat['id']);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Please keep at least one reason selected."),
+                              duration: Duration(milliseconds: 900),
+                            ),
+                          );
+                          return;
+                        }
+                      }
+                      _updateSeverityFromCategories();
+                    });
                   },
                 );
               }).toList(),
@@ -403,7 +483,10 @@ class _ReportDriverDialogState extends State<ReportDriverDialog> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
                     child: InkWell(
-                      onTap: () => setState(() => _selectedSeverity = level),
+                      onTap: () => setState(() {
+                        _selectedSeverity = level;
+                        _userOverrodeSeverity = true;
+                      }),
                       borderRadius: BorderRadius.circular(10),
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 8),
