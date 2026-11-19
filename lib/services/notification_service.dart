@@ -19,10 +19,20 @@ class NotificationService {
     try {
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-      await _requestPermission().timeout(const Duration(seconds: 3));
-      await _setupMessageHandlers().timeout(const Duration(seconds: 3));
+      // 1. Set up high-importance Android Notification Channel immediately
+      await setupFlutterNotifications();
 
-      final token = await _messaging.getToken().timeout(const Duration(seconds: 3));
+      // 2. Request notification permissions
+      await _requestPermission();
+
+      // 3. Set up foreground and tap listeners
+      await _setupMessageHandlers();
+
+      // 4. Fetch FCM token with safe timeout
+      final token = await _messaging.getToken().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => null,
+      );
       print('FCM Token: $token');
     } catch (e) {
       print('Notification Service Init Error: $e');
@@ -86,13 +96,14 @@ class NotificationService {
 
   Future<void> showNotification(RemoteMessage message) async {
     RemoteNotification? notification = message.notification;
-    AndroidNotification? android = message.notification?.android;
+    String? title = notification?.title ?? message.data['title'];
+    String? body = notification?.body ?? message.data['body'];
 
-    if (notification != null && android != null) {
+    if (title != null && title.isNotEmpty) {
       await _localNotifications.show(
-        notification.hashCode,
-        notification.title,
-        notification.body,
+        message.hashCode,
+        title,
+        body ?? '',
         NotificationDetails(
           android: AndroidNotificationDetails(
             'high_importance_channel',

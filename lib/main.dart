@@ -17,9 +17,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    await Firebase.initializeApp().timeout(const Duration(seconds: 5));
-    await FirebaseMessaging.instance.requestPermission().timeout(const Duration(seconds: 3));
-    await NotificationService.instance.initialize().timeout(const Duration(seconds: 3));
+    await Firebase.initializeApp().timeout(const Duration(seconds: 8));
+    await NotificationService.instance.initialize();
   } catch (e) {
     debugPrint("Firebase Init Error: $e");
   }
@@ -118,25 +117,54 @@ class _MyAppState extends State<MyApp> {
   // ✅ FCM moved to separate safe function
   Future<void> _setupFCM(String phone) async {
     try {
-      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+      final tenDigit = cleanPhone.length > 10
+          ? cleanPhone.substring(cleanPhone.length - 10)
+          : cleanPhone;
 
-      await FirebaseMessaging.instance
-          .subscribeToTopic("rentox_customer")
-          .timeout(const Duration(seconds: 5));
+      // 1. Fetch token safely
+      String? fcmToken = await FirebaseMessaging.instance.getToken().timeout(
+        const Duration(seconds: 12),
+        onTimeout: () => null,
+      );
 
-      await FirebaseMessaging.instance
-          .subscribeToTopic("rentox_all")
-          .timeout(const Duration(seconds: 5));
+      debugPrint("FCM Token obtained for $tenDigit: $fcmToken");
 
-      if (fcmToken != null) {
-        await http.post(
-          Uri.parse("${ApiConfig.baseUrl}/update_cust_fcm.php"),
-          body: {
-            "phone_number": phone,
-            "fcm_token": fcmToken,
-          },
-        ).timeout(const Duration(seconds: 8));
+      // 2. Immediately send token to backend with headers
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        try {
+          final res = await http.post(
+            Uri.parse("${ApiConfig.baseUrl}/update_cust_fcm.php"),
+            headers: ApiConfig.defaultHeaders(),
+            body: {
+              "phone_number": tenDigit,
+              "fcm_token": fcmToken,
+            },
+          ).timeout(const Duration(seconds: 8));
+          debugPrint("FCM upload response: ${res.statusCode} ${res.body}");
+        } catch (uploadErr) {
+          debugPrint("FCM upload error: $uploadErr");
+        }
       }
+
+      // 3. Listen for token refreshes dynamically
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+        debugPrint("FCM Token refreshed: $newToken");
+        try {
+          await http.post(
+            Uri.parse("${ApiConfig.baseUrl}/update_cust_fcm.php"),
+            headers: ApiConfig.defaultHeaders(),
+            body: {
+              "phone_number": tenDigit,
+              "fcm_token": newToken,
+            },
+          ).timeout(const Duration(seconds: 8));
+        } catch (_) {}
+      });
+
+      // 4. Topic subscriptions (non-blocking in background)
+      FirebaseMessaging.instance.subscribeToTopic("rentox_customer").catchError((_) {});
+      FirebaseMessaging.instance.subscribeToTopic("rentox_all").catchError((_) {});
     } catch (e) {
       debugPrint("FCM Error: $e");
     }
